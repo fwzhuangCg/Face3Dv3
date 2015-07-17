@@ -92,9 +92,9 @@ public class IOHelper {
             DataOutputStream out = new DataOutputStream(new FileOutputStream(outFile));
 
             for (Pixel p : pixelList) {
-                out.writeFloat(p.r);
-                out.writeFloat(p.g);
-                out.writeFloat(p.b);
+                out.writeFloat(p.getR());
+                out.writeFloat(p.getG());
+                out.writeFloat(p.getB());
             }
             Log.d(TAG,"close");
             out.close();

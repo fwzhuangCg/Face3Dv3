@@ -2,38 +2,40 @@ package com.example.jrme.face3dv3.util;
 
 import android.graphics.Color;
 
+import java.util.List;
+
 /**
  * Created by JR on 2015/6/23.
  */
 public class Pixel {
 
-        /** valeur du pixel */
-        public final int rgb;
+    /** valeur du pixel */
+    private int rgb;
 
-        public final int x;
-        public final int y;
+    private int x;
+    private int y;
 
-        public final float r;
-        public final float g;
-        public final float b;
+    private float r;
+    private float g;
+    private float b;
 
     /**
-         * Construction du pixel par interpolation.
-         * @param x abscisse initiale
-         * @param y ordonee initiale
-         * @param rgb valeur du pixel
-         */
-        public Pixel(int x,int y,int rgb)
-        {
-            // Enregistrement de la couleur
-            this.rgb = rgb;
-            this.r = Color.red(rgb);
-            this.g = Color.green(rgb);
-            this.b = Color.blue(rgb);
+     * Construction du pixel par interpolation.
+     * @param x abscisse initiale
+     * @param y ordonee initiale
+     * @param rgb valeur du pixel
+     */
+    public Pixel(int x,int y,int rgb)
+    {
+        // Enregistrement de la couleur
+        this.rgb = rgb;
+        this.r = Color.red(rgb);
+        this.g = Color.green(rgb);
+        this.b = Color.blue(rgb);
 
-            this.x = x;
-            this.y = y;
-        }
+        this.x = x;
+        this.y = y;
+    }
 
     @Override
     public boolean equals(Object o) {
@@ -53,5 +55,29 @@ public class Pixel {
         result = 31 * result + x;
         result = 31 * result + y;
         return result;
+    }
+
+    public int getRgb() {
+        return rgb;
+    }
+
+    public int getX() {
+        return x;
+    }
+
+    public int getY() {
+        return y;
+    }
+
+    public float getG() {
+        return g;
+    }
+
+    public float getB() {
+        return b;
+    }
+
+    public float getR() {
+        return r;
     }
 }
