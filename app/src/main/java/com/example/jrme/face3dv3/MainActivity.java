@@ -58,10 +58,13 @@ import java.util.Iterator;
 import java.util.List;
 
 import static com.example.jrme.face3dv3.Constants.BYTES_PER_FLOAT;
+import static com.example.jrme.face3dv3.util.IOHelper.fileSize;
 import static com.example.jrme.face3dv3.util.MatrixHelper.centroid;
 import static com.example.jrme.face3dv3.util.MatrixHelper.translate;
 
 import static com.example.jrme.face3dv3.util.IOHelper.readBinModel83Pt2DFloat;
+import static com.example.jrme.face3dv3.util.IOHelper.readBinFloat;
+
 /**
  * Get a picture form your phone<br />
  * Use the facepp api to detect face<br />
@@ -101,10 +104,15 @@ public class MainActivity extends Activity {
     private float[][] initialPoints = new float[83][2];
     float rollAngle = 0.0f;
 
-    List<Pixel> facePixels;
+    List<Pixel> facePixels, modelPixels;
 
-    private static final String CONFIG_DIRECTORY ="3DFace/DMM/config";
+    private static final String CONFIG_DIRECTORY = "3DFace/DMM/config";
     private static final String MODEL_2D_83PT_FILE = "ModelPoints2D.dat";
+
+
+    private static final String TEXTURE_DIRECTORY ="3DFace/DMM/Texture";
+    private static final String TEXTURE_FILE = "averageTextureVector.dat";
+    private static final int NUM_CASES = fileSize(TEXTURE_DIRECTORY, TEXTURE_FILE)/BYTES_PER_FLOAT;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -575,15 +583,20 @@ public class MainActivity extends Activity {
                         }
                     });
 
+                    //modelPixels
+                    float[] modelPixelsA = readBinFloat(TEXTURE_DIRECTORY, TEXTURE_FILE, NUM_CASES);
+                    for(int i=0; i<NUM_CASES+1;i++){
+                        //get r g b float
+
+                        //build the modelPixels
+                    }
+
                     //calculate Ei and Ef from Cost Function
                     CostFunction costFunc =  new CostFunction(facePixels,facePixels,xBedMatrix,xResult);
                     int Ei= costFunc.getEi();
                     Log.d(TAG,"Ei = "+Ei);
                     int Ef = costFunc.getEf();
                     Log.d(TAG,"Ef = "+Ef);
-                    Log.d(TAG,"xBedMatrix = "+xBedMatrix);
-                    Log.d(TAG,"xResult = "+xResult);
-
 
                     msg = mHandler.obtainMessage(EXTRACT_OK);
                 } catch (Exception e) {
