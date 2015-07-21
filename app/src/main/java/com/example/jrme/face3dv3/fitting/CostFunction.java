@@ -10,7 +10,8 @@ import static com.example.jrme.face3dv3.Constants.BYTES_PER_FLOAT;
 import static com.example.jrme.face3dv3.util.IOHelper.fileSize;
 import static com.example.jrme.face3dv3.util.IOHelper.readBin83PtIndex;
 import static com.example.jrme.face3dv3.util.IOHelper.readBinFloat;
-import static com.example.jrme.face3dv3.util.IOHelper.readBinFloatMatrix;
+import static com.example.jrme.face3dv3.util.IOHelper.readBinFloatDoubleArray;
+import static com.example.jrme.face3dv3.util.PixelUtil.getPixel;
 import static java.lang.Math.abs;
 import static java.lang.Math.pow;
 
@@ -32,7 +33,6 @@ public class CostFunction {
     private static final String INDEX83PT_FILE = "Featurepoint_Index.dat";
 
     private static final String FEATURE_S_FILE = "featureVector_Shape.dat"; //BIG
-    //private static final int NUM_FEATURE_S = fileSize(SHAPE_DIRECTORY, FEATURE_S_FILE)/BYTES_PER_FLOAT;
 
     private float E;
     private float Ei;
@@ -44,7 +44,7 @@ public class CostFunction {
     private float[] beta = new float[60];
     private float[] eigValS;
     private float[] eigValT = new float[60];
-    private RealMatrix s; // eigenVector // BIG
+    private float[][] s; // eigenVector // BIG
 
     private List<Pixel> average;
     private List<Pixel> input;
@@ -76,7 +76,8 @@ public class CostFunction {
             throw new IllegalArgumentException("inputFeatPts and averageFeatPts do not have the same size");
         }
 
-        this.s = readBinFloatMatrix(SHAPE_DIRECTORY, FEATURE_S_FILE, 192420, 60); // 1min30s more or less
+        // this.s = readBinFloatMatrix(SHAPE_DIRECTORY, FEATURE_S_FILE, 192420, 60); //too much memory
+        this.s = readBinFloatDoubleArray(SHAPE_DIRECTORY, FEATURE_S_FILE, 192420, 60);
         this.alpha = computeAlpha();
         for(int i=0; i <alpha.length; i++){
             Log.d(TAG,"alpha["+i+"] = "+alpha[i]);
@@ -138,7 +139,26 @@ public class CostFunction {
                 + 0.5876f * average.get(idx).getG()
                 + 0.114f * average.get(idx).getB();
         for(int i =0; i<60; i++){
-            tmp += alpha[i] * (s.getEntry(idx * 3,i) + s.getEntry(idx * 3 + 2,i));
+            tmp += alpha[i] * (s[idx * 3][i] + s[idx * 3 + 2][i]);
+        }
+        return Iaverage + tmp;
+    }
+
+    private float Imodel(int x, int y){
+        float Iaverage, tmp = 0.0f;
+        Pixel pix = getPixel(average, x, y);
+        if(pix == null){
+            throw new IllegalArgumentException("getPixel didn't succeed");
+        }
+        Iaverage = 0.299f * pix.getR()
+                + 0.5876f * pix.getG()
+                + 0.114f * pix.getB();
+        int idx = average.lastIndexOf(pix);
+        if (idx == -1){
+            throw new IllegalArgumentException("No index for x =" + x + " and y = "+y);
+        }
+        for(int i =0; i<60; i++){
+            tmp += alpha[i] * (s[idx * 3][i] + s[idx * 3 + 2][i]);
         }
         return Iaverage + tmp;
     }
@@ -249,32 +269,39 @@ public class CostFunction {
             yA = (float) averageFeatPts.getEntry(j,1);
 
             for(int a =0; a < 60; a++){
-                tmp += (float) (alpha_i * (s.getEntry(featPtsIndex[j] * 3,a) + s.getEntry(featPtsIndex[j] * 3 + 2,a)));
+                tmp += alpha_i * (s[featPtsIndex[j] * 3][a] + s[featPtsIndex[j] * 3 + 2][a]);
             }
             res += -2.0f
                     * ((xIn + yIn) - (xA + yA) - tmp)
                     * alpha_i
-                    * (s.getEntry(featPtsIndex[j] * 3,i) + s.getEntry(featPtsIndex[j] * 3 + 2,i));
+                    * (s[featPtsIndex[j] * 3][i] + s[featPtsIndex[j] * 3 + 2][i]);
         }
-        Log.d(TAG,"alpha_i = "+alpha_i);
         return res;
     }
 
     private float deriv2Ef(int i, float alpha_i){
         float res = 0.0f;
         for(int j=0; j<k; j++) {
-            res += -2.0f * alpha_i * (s.getEntry(featPtsIndex[j] * 3,i) + s.getEntry(featPtsIndex[j] * 3 + 2,i));
+            res += -2.0f * alpha_i * (s[featPtsIndex[j] * 3][i] + s[featPtsIndex[j] * 3 + 2][i]);
         }
-        Log.d(TAG,"alpha_i = "+alpha_i);
         return res;
     }
 
     private float derivImodel(int i, int idx){
         float Ix, Iy, res;
+        Log.d(TAG,"derivImodel i = " + i + " idx = " + idx);
+        int x = average.get(idx).getX();
+        Log.d(TAG,"derivImodel x = " + x);
+        int y = average.get(idx).getY();
+        Log.d(TAG,"derivImodel y = " + y);
 
+        Ix = (Imodel(x + 1, y) - Imodel(x - 1, y)) / 2;
+        Iy = (Imodel(x, y + 1) - Imodel(x, y - 1)) / 2;
+/*
         Ix = (Imodel(idx + 1) - Imodel(idx - 1)) / 2;
         Iy = (Imodel(idx + 1) - Imodel(idx - 1)) / 2;
-        res = (float) (Ix * s.getEntry(idx * 3, i) + Iy * s.getEntry(idx * 3 + 2, i));
+*/
+        res = Ix * s[idx * 3][i] + Iy * s[idx * 3 + 2][i];
 
         return res;
     }

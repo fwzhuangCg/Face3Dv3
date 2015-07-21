@@ -407,7 +407,7 @@ public class IOHelper {
     }
 
     /*
-    * Read the 2D shape binary file.
+    * Read the featureVector_Shape.dat file.
     * Build the matrix and return it.
     */
     public static RealMatrix readBinFloatMatrix(String dir, String fileName, int k, int n) {
@@ -446,5 +446,44 @@ public class IOHelper {
             e.printStackTrace();
         }
         return matrix;
+    }
+
+    /**
+     * Read the featureVector_Shape.dat file.
+     * Build the double array and return it.
+     */
+    public static float[][] readBinFloatDoubleArray(String dir, String fileName, int k, int n) {
+        float[][] array2D = new float[k][n];
+        float x;
+        File sdLien = Environment.getExternalStorageDirectory();
+        File inFile = new File(sdLien + File.separator + dir + File.separator + fileName);
+        Log.d(TAG, "path of file : " + inFile);
+        if (!inFile.exists()) {
+            throw new RuntimeException("File doesn't exist");
+        }
+        DataInputStream in = null;
+        try {
+            in = new DataInputStream(new FileInputStream(inFile));
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+        try {
+                for(int i=0; i< k; i++){
+                    for(int j=0; j< n; j++){
+                        x = in.readFloat();
+                        array2D[i][j] = x;
+                    }
+                }
+        } catch (EOFException e) {
+            try {
+                Log.d(TAG,"close");
+                in.close();
+            } catch (IOException e1) {
+                e1.printStackTrace();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return array2D;
     }
 }
