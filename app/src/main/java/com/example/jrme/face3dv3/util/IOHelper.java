@@ -406,4 +406,45 @@ public class IOHelper {
         return array3D;
     }
 
+    /*
+    * Read the 2D shape binary file.
+    * Build the matrix and return it.
+    */
+    public static RealMatrix readBinFloatMatrix(String dir, String fileName, int k, int n) {
+        float x;
+        RealMatrix matrix = new Array2DRowRealMatrix(k, n);
+
+        File sdLien = Environment.getExternalStorageDirectory();
+        File inFile = new File(sdLien + File.separator + dir + File.separator + fileName);
+        Log.d(TAG, "path of file : " + inFile);
+        if (!inFile.exists()) {
+            throw new RuntimeException("File doesn't exist");
+        }
+        DataInputStream in = null;
+        try {
+            in = new DataInputStream(new FileInputStream(inFile));
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+        try {
+            while (true) {
+                for(int i=0; i<k; i++){
+                    for(int j=0; j<n; j++){
+                        x = in.readFloat();
+                        matrix.setEntry(i, j, x);
+                    }
+                }
+            }
+        } catch (EOFException e) {
+            try {
+                Log.d(TAG,"close");
+                in.close();
+            } catch (IOException e1) {
+                e1.printStackTrace();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return matrix;
+    }
 }

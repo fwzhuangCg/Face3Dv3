@@ -57,7 +57,7 @@ public class Pixel {
         return result;
     }
 
-    public int getRgb() {
+    public int getRGB() {
         return rgb;
     }
 
@@ -69,6 +69,10 @@ public class Pixel {
         return y;
     }
 
+    public float getR() {
+        return r;
+    }
+
     public float getG() {
         return g;
     }
@@ -77,7 +81,4 @@ public class Pixel {
         return b;
     }
 
-    public float getR() {
-        return r;
-    }
 }

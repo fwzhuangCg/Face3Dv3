@@ -104,15 +104,17 @@ public class MainActivity extends Activity {
     private float[][] initialPoints = new float[83][2];
     float rollAngle = 0.0f;
 
-    List<Pixel> facePixels, modelPixels;
+    List<Pixel> facePixels, averagePixels;
 
     private static final String CONFIG_DIRECTORY = "3DFace/DMM/config";
     private static final String MODEL_2D_83PT_FILE = "ModelPoints2D.dat";
 
-
     private static final String TEXTURE_DIRECTORY ="3DFace/DMM/Texture";
-    private static final String TEXTURE_FILE = "averageTextureVector.dat";
-    private static final int NUM_CASES = fileSize(TEXTURE_DIRECTORY, TEXTURE_FILE)/BYTES_PER_FLOAT;
+    private static final String SHAPE_DIRECTORY ="3DFace/DMM/Shape";
+    private static final String AVERAGE_TEXTURE_FILE = "averageTextureVector.dat";
+    private static final String AVERAGE_SHAPE_FILE = "averageShapeVector.dat";
+
+    private static final int NUM_CASES = fileSize(TEXTURE_DIRECTORY, AVERAGE_TEXTURE_FILE)/BYTES_PER_FLOAT;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -566,12 +568,10 @@ public class MainActivity extends Activity {
                     }
 
                     Log.d(TAG, "pixels list size = " + facePixels.size());
-                    //List<Pixel> diff = facePixels;
-                    //        new ArrayList<>(new LinkedHashSet<>(pixels)); //delete pixels occurence
 
                     //draw on white face
                     for (Pixel p : facePixels) {
-                        bitmap.setPixel(p.x,p.y,p.rgb);
+                        bitmap.setPixel(p.getX(),p.getY(),p.getRGB());
                     }
 
                     //save new image
@@ -583,20 +583,26 @@ public class MainActivity extends Activity {
                         }
                     });
 
-                    //modelPixels
-                    float[] modelPixelsA = readBinFloat(TEXTURE_DIRECTORY, TEXTURE_FILE, NUM_CASES);
-                    for(int i=0; i<NUM_CASES+1;i++){
-                        //get r g b float
-
-                        //build the modelPixels
+                    // build averagePixels
+                    float[] averageTexture = readBinFloat(TEXTURE_DIRECTORY, AVERAGE_TEXTURE_FILE, NUM_CASES);
+                    float[] averageShape = readBinFloat(SHAPE_DIRECTORY, AVERAGE_SHAPE_FILE, NUM_CASES);
+                    Log.d(TAG,"NUM CASES = "+ NUM_CASES);
+                    Log.d(TAG,"averageTexture size = "+ averageTexture.length);
+                    Log.d(TAG,"averageShape size = "+ averageShape.length);
+                    averagePixels = new ArrayList<>();
+                    for(int i=0, idx=0; i<NUM_CASES; i=i+3,idx++){
+                        //get r g b and x y
+                        //Log.d(TAG,"tmp = "+tmp);
+                        int rgb = (int) (averageTexture[i] + averageTexture[i + 1] + averageTexture[i + 2]);
+                        Pixel p = new Pixel((int) averageShape[i], (int) averageShape[i + 2], rgb);
+                        averagePixels.add(idx, p);
                     }
 
-                    //calculate Ei and Ef from Cost Function
-                    CostFunction costFunc =  new CostFunction(facePixels,facePixels,xBedMatrix,xResult);
-                    int Ei= costFunc.getEi();
-                    Log.d(TAG,"Ei = "+Ei);
-                    int Ef = costFunc.getEf();
-                    Log.d(TAG,"Ef = "+Ef);
+                    //compute Cost Function
+                    Log.d(TAG,"facePixels size = "+facePixels.size());
+                    Log.d(TAG,"averagePixels size = "+ averagePixels.size());
+                    CostFunction costFunc =  new CostFunction(facePixels,averagePixels,xBedMatrix,xResult);
+                    Log.d(TAG,"k = "+costFunc.getK());
 
                     msg = mHandler.obtainMessage(EXTRACT_OK);
                 } catch (Exception e) {
