@@ -4,7 +4,6 @@ import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.Bitmap;
@@ -21,6 +20,7 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.provider.MediaStore;
+import android.support.annotation.NonNull;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -33,21 +33,17 @@ import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
-
 import com.example.jrme.face3dv3.fitting.CostFunction;
 import com.example.jrme.face3dv3.util.IOHelper;
 import com.example.jrme.face3dv3.util.MyProcrustes;
 import com.example.jrme.face3dv3.util.Pixel;
-import com.example.jrme.face3dv3.util.TextResourceReader;
 import com.facepp.error.FaceppParseException;
 import com.facepp.http.HttpRequests;
 import com.facepp.http.PostParameters;
-
 import org.apache.commons.math3.linear.Array2DRowRealMatrix;
 import org.apache.commons.math3.linear.RealMatrix;
 import org.json.JSONException;
 import org.json.JSONObject;
-
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -59,6 +55,8 @@ import java.util.List;
 
 import static com.example.jrme.face3dv3.Constants.BYTES_PER_FLOAT;
 import static com.example.jrme.face3dv3.util.IOHelper.fileSize;
+import static com.example.jrme.face3dv3.util.IOHelper.readBinFloatDoubleArray;
+import static com.example.jrme.face3dv3.util.IOHelper.writeBinFloat;
 import static com.example.jrme.face3dv3.util.MatrixHelper.centroid;
 import static com.example.jrme.face3dv3.util.MatrixHelper.translate;
 
@@ -74,6 +72,7 @@ import static com.example.jrme.face3dv3.util.IOHelper.readBinFloat;
  * Show the face !
  * @author Jerome & Xiaoping
  */
+
 public class MainActivity extends Activity {
 
     private static final String TAG = "MainActivity";
@@ -111,10 +110,15 @@ public class MainActivity extends Activity {
 
     private static final String TEXTURE_DIRECTORY ="3DFace/DMM/Texture";
     private static final String SHAPE_DIRECTORY ="3DFace/DMM/Shape";
+
     private static final String AVERAGE_TEXTURE_FILE = "averageTextureVector.dat";
     private static final String AVERAGE_SHAPE_FILE = "averageShapeVector.dat";
+    private static final String FEATURE_S_FILE = "featureVector_Shape.dat"; //BIG
+    private static final String MODEL_SHAPE_FILE = "modelShapeVector.dat";
 
     private static final int NUM_CASES = fileSize(TEXTURE_DIRECTORY, AVERAGE_TEXTURE_FILE)/BYTES_PER_FLOAT;
+
+    private float[] modelShape;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -257,7 +261,10 @@ public class MainActivity extends Activity {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-                String orientString = exif.getAttribute(ExifInterface.TAG_ORIENTATION);
+                String orientString = null;
+                if (exif != null) {
+                    orientString = exif.getAttribute(ExifInterface.TAG_ORIENTATION);
+                }
                 int orientation = orientString != null ? Integer.parseInt(orientString) :  ExifInterface.ORIENTATION_NORMAL;
 
                 int rotationAngle = 0;
@@ -293,8 +300,10 @@ public class MainActivity extends Activity {
             if (resultCode == Activity.RESULT_OK) {
 
                 // Free the data of the last picture
-                if(img != null || imgBeforeDetect != null){
+                if (img != null) {
                     img.recycle();
+                }
+                if (imgBeforeDetect != null) {
                     imgBeforeDetect.recycle();
                 }
 
@@ -317,7 +326,10 @@ public class MainActivity extends Activity {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-                String orientString = exif.getAttribute(ExifInterface.TAG_ORIENTATION);
+                String orientString = null;
+                if (exif != null) {
+                    orientString = exif.getAttribute(ExifInterface.TAG_ORIENTATION);
+                }
                 int orientation = orientString != null ? Integer.parseInt(orientString) :  ExifInterface.ORIENTATION_NORMAL;
 
                 int rotationAngle = 0;
@@ -403,15 +415,14 @@ public class MainActivity extends Activity {
                             msg = mHandler.obtainMessage(DETECT_OK);
                             callback.detectResult(result2); //landmark as the result (1 face only)
                         }
-                    } catch (FaceppParseException e) {
-                        e.printStackTrace();
-                        msg = mHandler.obtainMessage(ERROR);
-                    } catch (JSONException e) {
+                    } catch (FaceppParseException | JSONException e) {
                         e.printStackTrace();
                         msg = mHandler.obtainMessage(ERROR);
                     } finally{
                         // send the message
-                        mHandler.sendMessage(msg);
+                        if (msg != null) {
+                            mHandler.sendMessage(msg);
+                        }
                     }
                 }
             }).start();
@@ -522,13 +533,14 @@ public class MainActivity extends Activity {
                     Log.d(TAG, "T = " + T);
 
                     // load the 2D average shape
-                    int cases = IOHelper.fileSize("3DFace/AverageFaceData/BinFiles", "averageFace2DNotScaled.dat") / BYTES_PER_FLOAT;
+                    int cases = IOHelper.fileSize("3DFace/AverageFaceData/BinFiles",
+                            "averageFace2DNotScaled.dat") / BYTES_PER_FLOAT;
                     int k = cases / 2; // Number of Lines == Row Dimension
                     RealMatrix averageShape2D =
-                            IOHelper.readBin2DShapetoMatrix("3DFace/AverageFaceData/BinFiles", "averageFace2DNotScaled.dat", k);
-
+                            IOHelper.readBin2DShapetoMatrix("3DFace/AverageFaceData/BinFiles",
+                                    "averageFace2DNotScaled.dat", k);
                     // adapt the translation matrix to the new dimension (64.140 rows)
-                    double tx = T.getEntry(0, 0), ty = T.getEntry(0, 1);// +18;
+                    double tx = T.getEntry(0, 0), ty = T.getEntry(0, 1) + 18;// +18;
                     RealMatrix tt = new Array2DRowRealMatrix(k, 2);
                     for (int i = 0; i < k; i++) {
                         tt.setEntry(i, 0, tx);
@@ -592,17 +604,37 @@ public class MainActivity extends Activity {
                     averagePixels = new ArrayList<>();
                     for(int i=0, idx=0; i<NUM_CASES; i=i+3,idx++){
                         //get r g b and x y
-                        //Log.d(TAG,"tmp = "+tmp);
-                        int rgb = (int) (averageTexture[i] + averageTexture[i + 1] + averageTexture[i + 2]);
+                        int rgb = Color.rgb((int) averageTexture[i], (int) averageTexture[i + 1], (int) averageTexture[i + 2]);
                         Pixel p = new Pixel((int) averageShape[i], (int) averageShape[i + 2], rgb);
                         averagePixels.add(idx, p);
                     }
 
+                    // it was just for checking both list in a txt file
+                    //writePixels("3DFace/AverageFaceData", "facePixels.txt", facePixels);
+                    //writePixels("3DFace/AverageFaceData","averagePixels.txt",averagePixels);
+
                     //compute Cost Function
+                    float [][] s = readBinFloatDoubleArray(SHAPE_DIRECTORY, FEATURE_S_FILE, 192420, 60); //BIG
                     Log.d(TAG,"facePixels size = "+facePixels.size());
                     Log.d(TAG,"averagePixels size = "+ averagePixels.size());
-                    CostFunction costFunc =  new CostFunction(facePixels,averagePixels,xBedMatrix,xResult);
-                    Log.d(TAG,"k = "+costFunc.getK());
+                    CostFunction costFunc =  new CostFunction(facePixels,averagePixels,xBedMatrix,xResult, s);
+                    float[] alpha = costFunc.getAlpha();
+
+                    // build the 3DMM using alpha values ///////////////////////////////////////////
+                    float res1 = 0.0f, res2 = 0.0f, res3 = 0.0f;
+                    modelShape = new float[NUM_CASES];
+                    for(int i=0; i<NUM_CASES; i=i+3){
+
+                        for(int a=0; a <60; a++){
+                            res1 += alpha[a] * s[i][a];
+                            res2 += alpha[a] * s[i + 1][a];
+                            res3 += alpha[a] * s[i +2][a];
+                        }
+                        modelShape[i] = averageShape[i] + res1;
+                        modelShape[i+1] = averageShape[i+1] + res2;
+                        modelShape[i+2] = averageShape[i+2] + res3;
+                    }
+                    ////////////////////////////////////////////////////////////////////////////////
 
                     msg = mHandler.obtainMessage(EXTRACT_OK);
                 } catch (Exception e) {
@@ -610,7 +642,9 @@ public class MainActivity extends Activity {
                     msg = mHandler.obtainMessage(ERROR);
                 } finally {
                     // send the message
-                    mHandler.sendMessage(msg);
+                    if (msg != null) {
+                        mHandler.sendMessage(msg);
+                    }
                 }
             }
 
@@ -626,14 +660,17 @@ public class MainActivity extends Activity {
                 Message msg = null;
 
                 try {
-                    IOHelper.convertPixelsToBin(facePixels,"3DFace/AverageFaceData/BinFiles/faceTexture.dat");
+                    IOHelper.convertPixelsToBin(facePixels, "3DFace/DMM/Texture/faceTexture.dat");
+                    writeBinFloat(SHAPE_DIRECTORY, MODEL_SHAPE_FILE, modelShape);
                     msg = mHandler.obtainMessage(SAVE_OK);
                 } catch (Exception e) {
                     e.printStackTrace();
                     msg = mHandler.obtainMessage(ERROR);
                 } finally {
                     // send the message
-                    mHandler.sendMessage(msg);
+                    if (msg != null) {
+                        mHandler.sendMessage(msg);
+                    }
                 }
             }
 
@@ -721,12 +758,11 @@ public class MainActivity extends Activity {
         String imageFileName = "JPEG_" + timeStamp + "_";
         File storageDir = Environment.getExternalStoragePublicDirectory(
                 Environment.DIRECTORY_PICTURES);
-        File image = File.createTempFile(
+        return File.createTempFile(
                 imageFileName,  /* prefix */
                 ".jpg",         /* suffix */
                 storageDir      /* directory */
         );
-        return image;
     }
 
     // add the taken image in the gallery application
@@ -741,13 +777,13 @@ public class MainActivity extends Activity {
 
     /* Some lifecycle callbacks so that the image location path can survive orientation change */
     @Override
-    protected void onSaveInstanceState(Bundle outState){
+    protected void onSaveInstanceState(@NonNull Bundle outState){
         outState.putString(PICTURE_PATH, mCurrentPhotoPath);
         super.onSaveInstanceState(outState);
     }
 
     @Override
-    protected void onRestoreInstanceState(Bundle savedInstanceState){
+    protected void onRestoreInstanceState(@NonNull Bundle savedInstanceState){
         super.onRestoreInstanceState(savedInstanceState);
         mCurrentPhotoPath = savedInstanceState.getString(PICTURE_PATH);
     }
@@ -786,8 +822,10 @@ public class MainActivity extends Activity {
     public void onDestroy() {
         super.onDestroy();
         Log.d(TAG, "onDestroy");
-        if (img != null || imgBeforeDetect != null) {
+        if (img != null) {
             img.recycle();
+        }
+        if (imgBeforeDetect != null) {
             imgBeforeDetect.recycle();
         }
     }

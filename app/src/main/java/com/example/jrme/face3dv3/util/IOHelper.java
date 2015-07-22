@@ -76,6 +76,15 @@ public class IOHelper {
             }
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            if (in != null) {
+                try { //free ressources
+                    Log.d(TAG,"close");
+                    in.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
         return matrix;
     }
@@ -87,19 +96,30 @@ public class IOHelper {
 
         File sdLien = Environment.getExternalStorageDirectory();
         File outFile = new File(sdLien + File.separator + fileDest);
+        Log.d(TAG, "path of file : " + outFile);
+        DataOutputStream out = null;
         try {
-            //By default, a scanner uses white space to separate tokens
-            DataOutputStream out = new DataOutputStream(new FileOutputStream(outFile));
-
+            out = new DataOutputStream(new FileOutputStream(outFile));
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+        try {
             for (Pixel p : pixelList) {
                 out.writeFloat(p.getR());
                 out.writeFloat(p.getG());
                 out.writeFloat(p.getB());
             }
-            Log.d(TAG,"close");
-            out.close();
         } catch (Exception e) {
             e.printStackTrace();
+        } finally {
+            if (out != null) {
+                try { //free ressources
+                    Log.d(TAG,"close");
+                    out.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
     }
 
@@ -164,6 +184,15 @@ public class IOHelper {
             }
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            if (in != null) {
+                try { //free ressources
+                    Log.d(TAG,"close");
+                    in.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
         return tab;
     }
@@ -203,6 +232,15 @@ public class IOHelper {
             }
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            if (in != null) {
+                try { //free ressources
+                    Log.d(TAG,"close");
+                    in.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
         return tab;
     }
@@ -242,6 +280,15 @@ public class IOHelper {
             }
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            if (in != null) {
+                try { //free ressources
+                    Log.d(TAG,"close");
+                    in.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
         return tab;
     }
@@ -281,6 +328,15 @@ public class IOHelper {
             }
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            if (in != null) {
+                try { //free ressources
+                    Log.d(TAG,"close");
+                    in.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
         return tab;
     }
@@ -306,7 +362,7 @@ public class IOHelper {
         }
         try {
             x = in.readFloat();
-            while (true) {
+            while (i<size) {
                 tab[i] = x;
                 i++;
                 x = in.readFloat();
@@ -320,6 +376,15 @@ public class IOHelper {
             }
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            if (in != null) {
+                try { //free ressources
+                    Log.d(TAG,"close");
+                    in.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
         return tab;
     }
@@ -361,6 +426,15 @@ public class IOHelper {
             }
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            if (in != null) {
+                try { //free ressources
+                    Log.d(TAG,"close");
+                    in.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
         return array2D;
     }
@@ -402,6 +476,15 @@ public class IOHelper {
             }
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            if (in != null) {
+                try { //free ressources
+                    Log.d(TAG,"close");
+                    in.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
         return array3D;
     }
@@ -427,14 +510,12 @@ public class IOHelper {
             e.printStackTrace();
         }
         try {
-            while (true) {
                 for(int i=0; i<k; i++){
                     for(int j=0; j<n; j++){
                         x = in.readFloat();
                         matrix.setEntry(i, j, x);
                     }
                 }
-            }
         } catch (EOFException e) {
             try {
                 Log.d(TAG,"close");
@@ -444,6 +525,15 @@ public class IOHelper {
             }
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            if (in != null) {
+                try { //free ressources
+                    Log.d(TAG,"close");
+                    in.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
         return matrix;
     }
@@ -483,7 +573,50 @@ public class IOHelper {
             }
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            if (in != null) {
+                try { //free ressources
+                    Log.d(TAG,"close");
+                    in.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
         return array2D;
+    }
+
+    /**
+     * Write float array into binary file of float
+     */
+    public static void writeBinFloat(String dir, String fileName, float[] array) {
+
+        File sdLien = Environment.getExternalStorageDirectory();
+        File outFile = new File(sdLien + File.separator + dir + File.separator + fileName);
+        Log.d(TAG, "path of file : " + outFile);
+        DataOutputStream out = null;
+        try {
+            out = new DataOutputStream(new FileOutputStream(outFile));
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+        try {
+            for (float f : array) {
+                    out.writeFloat(f);
+            }
+            Log.d(TAG,"close");
+            out.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (out != null) {
+                try { //free ressources
+                    Log.d(TAG,"close");
+                    out.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
     }
 }
