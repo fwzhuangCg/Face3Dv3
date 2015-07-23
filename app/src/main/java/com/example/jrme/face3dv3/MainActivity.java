@@ -55,8 +55,10 @@ import java.util.List;
 
 import static com.example.jrme.face3dv3.Constants.BYTES_PER_FLOAT;
 import static com.example.jrme.face3dv3.util.IOHelper.fileSize;
+import static com.example.jrme.face3dv3.util.IOHelper.readBin2DShapetoMatrix;
 import static com.example.jrme.face3dv3.util.IOHelper.readBinFloatDoubleArray;
 import static com.example.jrme.face3dv3.util.IOHelper.writeBinFloat;
+import static com.example.jrme.face3dv3.util.ImageHelper.saveBitmaptoPNG;
 import static com.example.jrme.face3dv3.util.MatrixHelper.centroid;
 import static com.example.jrme.face3dv3.util.MatrixHelper.translate;
 
@@ -527,20 +529,27 @@ public class MainActivity extends Activity {
                     Log.d(TAG, "procrustes distance = " + distance);
                     RealMatrix R = mProc.getR();
                     Log.d(TAG, "R = " + R);
-                    double S = mProc.getS();
+                    double S = mProc.getS() * (1.0 - 8.0/100.0);
                     Log.d(TAG, "S = " + S);
                     RealMatrix T = mProc.getT();
                     Log.d(TAG, "T = " + T);
 
                     // load the 2D average shape
-                    int cases = IOHelper.fileSize("3DFace/AverageFaceData/BinFiles",
+                    /*int cases = fileSize("3DFace/AverageFaceData/BinFiles",
                             "averageFace2DNotScaled.dat") / BYTES_PER_FLOAT;
                     int k = cases / 2; // Number of Lines == Row Dimension
                     RealMatrix averageShape2D =
                             IOHelper.readBin2DShapetoMatrix("3DFace/AverageFaceData/BinFiles",
                                     "averageFace2DNotScaled.dat", k);
+                                    */
+                    int cases = fileSize("3DFace/AverageFaceData/BinFiles",
+                            "averageFace2DNotScaled.dat") / BYTES_PER_FLOAT;
+                    int k = cases / 2; // Number of Lines == Row Dimension
+                    RealMatrix averageShape2D =
+                            readBin2DShapetoMatrix("3DFace/AverageFaceData/BinFiles",
+                                    "averageFace2DNotScaled.dat", k);
                     // adapt the translation matrix to the new dimension (64.140 rows)
-                    double tx = T.getEntry(0, 0), ty = T.getEntry(0, 1) + 18;// +18;
+                    double tx = T.getEntry(0, 0), ty = T.getEntry(0, 1) +15;// +18; // higher value the face go down
                     RealMatrix tt = new Array2DRowRealMatrix(k, 2);
                     for (int i = 0; i < k; i++) {
                         tt.setEntry(i, 0, tx);
@@ -579,8 +588,6 @@ public class MainActivity extends Activity {
                         }
                     }
 
-                    Log.d(TAG, "pixels list size = " + facePixels.size());
-
                     //draw on white face
                     for (Pixel p : facePixels) {
                         bitmap.setPixel(p.getX(),p.getY(),p.getRGB());
@@ -595,7 +602,7 @@ public class MainActivity extends Activity {
                         }
                     });
 
-                    // build averagePixels
+                    // build averagePixels /////////////////////////////////////////////////////////
                     float[] averageTexture = readBinFloat(TEXTURE_DIRECTORY, AVERAGE_TEXTURE_FILE, NUM_CASES);
                     float[] averageShape = readBinFloat(SHAPE_DIRECTORY, AVERAGE_SHAPE_FILE, NUM_CASES);
                     Log.d(TAG,"NUM CASES = "+ NUM_CASES);
@@ -608,17 +615,38 @@ public class MainActivity extends Activity {
                         Pixel p = new Pixel((int) averageShape[i], (int) averageShape[i + 2], rgb);
                         averagePixels.add(idx, p);
                     }
+                    ////////////////////////////////////////////////////////////////////////////////
+
+                    // create an image of the model face ///////////////////////////////////////////
+                    int w = 474, h = 600;
+                    Bitmap bmpModel = Bitmap.createBitmap(w, h,
+                            Bitmap.Config.ARGB_8888); // this creates a MUTABLE bitmap
+                    for (Pixel p : averagePixels) {
+                        bmpModel.setPixel(w - (p.getX() + w/2) ,h - (p.getY() + h/2) // rotate 90 and center
+                                ,p.getRGB());
+                    }
+                    saveBitmaptoPNG(TEXTURE_DIRECTORY, "averageFace2D.png", bmpModel); //save
+
+                    //JPG to Bitmap to MAT
+                    Bitmap i = BitmapFactory.decodeFile(imgPath + "mms.jpg");
+                    Bitmap bmpImg = i.copy(Bitmap.Config.ARGB_8888, false);
+                    Mat srcMat = new Mat ( bmpImg.getHeight(), bmpImg.getWidth(), CvType.CV_8UC3);
+                    Utils.bitmapToMat(bmpImg, srcMat);
+                    ////////////////////////////////////////////////////////////////////////////////
 
                     // it was just for checking both list in a txt file
                     //writePixels("3DFace/AverageFaceData", "facePixels.txt", facePixels);
                     //writePixels("3DFace/AverageFaceData","averagePixels.txt",averagePixels);
-
-                    //compute Cost Function
-                    float [][] s = readBinFloatDoubleArray(SHAPE_DIRECTORY, FEATURE_S_FILE, 192420, 60); //BIG
+/*
+                    //compute Cost Function ////////////////////////////////////////////////////////
+                    float [][] s = readBinFloatDoubleArray(SHAPE_DIRECTORY,
+                            FEATURE_S_FILE, 192420, 60); //BIG
                     Log.d(TAG,"facePixels size = "+facePixels.size());
                     Log.d(TAG,"averagePixels size = "+ averagePixels.size());
-                    CostFunction costFunc =  new CostFunction(facePixels,averagePixels,xBedMatrix,xResult, s);
+                    CostFunction costFunc =  new CostFunction(facePixels,averagePixels,
+                            xBedMatrix,xResult, s);
                     float[] alpha = costFunc.getAlpha();
+                    ////////////////////////////////////////////////////////////////////////////////
 
                     // build the 3DMM using alpha values ///////////////////////////////////////////
                     float res1 = 0.0f, res2 = 0.0f, res3 = 0.0f;
@@ -635,7 +663,7 @@ public class MainActivity extends Activity {
                         modelShape[i+2] = averageShape[i+2] + res3;
                     }
                     ////////////////////////////////////////////////////////////////////////////////
-
+*/
                     msg = mHandler.obtainMessage(EXTRACT_OK);
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -661,7 +689,7 @@ public class MainActivity extends Activity {
 
                 try {
                     IOHelper.convertPixelsToBin(facePixels, "3DFace/DMM/Texture/faceTexture.dat");
-                    writeBinFloat(SHAPE_DIRECTORY, MODEL_SHAPE_FILE, modelShape);
+                    //writeBinFloat(SHAPE_DIRECTORY, MODEL_SHAPE_FILE, modelShape);
                     msg = mHandler.obtainMessage(SAVE_OK);
                 } catch (Exception e) {
                     e.printStackTrace();
