@@ -15,6 +15,9 @@ public class Pixel {
     private int x;
     private int y;
 
+    private float xF;
+    private float yF;
+
     private float r;
     private float g;
     private float b;
@@ -35,6 +38,24 @@ public class Pixel {
 
         this.x = x;
         this.y = y;
+    }
+
+    /**
+     * Construction du pixel par interpolation.
+     * @param x abscisse initiale
+     * @param y ordonee initiale
+     * @param rgb valeur du pixel
+     */
+    public Pixel(float x,float y,int rgb)
+    {
+        // Enregistrement de la couleur
+        this.rgb = rgb;
+        this.r = Color.red(rgb);
+        this.g = Color.green(rgb);
+        this.b = Color.blue(rgb);
+
+        this.xF = x;
+        this.yF = y;
     }
 
     @Override
@@ -67,6 +88,14 @@ public class Pixel {
 
     public int getY() {
         return y;
+    }
+
+    public float getXF() {
+        return xF;
+    }
+
+    public float getYF() {
+        return yF;
     }
 
     public float getR() {

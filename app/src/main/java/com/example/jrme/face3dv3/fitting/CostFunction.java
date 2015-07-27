@@ -1,11 +1,16 @@
 package com.example.jrme.face3dv3.fitting;
 
+import android.graphics.Bitmap;
 import android.nfc.Tag;
 import android.util.Log;
 
+import com.example.jrme.face3dv3.filters.convolution.SobelFilterGx;
+import com.example.jrme.face3dv3.filters.convolution.SobelFilterGy;
 import com.example.jrme.face3dv3.util.Pixel;
 import org.apache.commons.math3.linear.RealMatrix;
 import org.apache.commons.math3.stat.descriptive.moment.Mean;
+import org.opencv.android.Utils;
+import org.opencv.core.Mat;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -55,6 +60,9 @@ public class CostFunction {
     private RealMatrix modelFeatPts;
     private int[] featPtsIndex;
     private int k;
+    private Bitmap bmpModelGx;
+    private Bitmap bmpModelGy;
+    private int[][] indexOfModel;
 
     // range is [ 64140/3 ; 2 * 64140/3 ] for front face
     private int start = 21380, end = 42760; // we select 500 random values within this range
@@ -62,7 +70,8 @@ public class CostFunction {
 
     /////////////////////////////////// Constructor ////////////////////////////////////////////////
     public CostFunction(List<Pixel> input, List<Pixel> model,
-                        RealMatrix inputFeatPts, RealMatrix modelFeatPts, float [][] eigenVectors) {
+                        RealMatrix inputFeatPts, RealMatrix modelFeatPts, float [][] eigenVectors
+            , Bitmap bmpModel, int[][] indexOfModel) {
 
         this.featPtsIndex = readBin83PtIndex(CONFIG_DIRECTORY, INDEX83PT_FILE);
         this.input = input;
@@ -91,6 +100,10 @@ public class CostFunction {
         }
 
         this.s = eigenVectors;
+        this.indexOfModel = indexOfModel;
+        this.bmpModelGx = computeSobelGx(bmpModel);
+        this.bmpModelGy = computeSobelGy(bmpModel);
+
         this.alpha = computeAlpha();
 
     }
@@ -331,19 +344,52 @@ public class CostFunction {
     }
 
     private float derivImodel(int i, int idx){
-        float Ix, Iy, res;
-        int x = model.get(idx).getX();
-        int y = model.get(idx).getY();
+        float Gx, Gy, res;
+        int x = indexOfModel[idx][0];
+        int y = indexOfModel[idx][1];
 
-//        Ix = (Imodel(x + 1, y) - Imodel(x - 1, y)) / 2; //// takes too much times
-//        Iy = (Imodel(x, y + 1) - Imodel(x, y - 1)) / 2; //// takes too much times
+        Gx = bmpModelGx.getPixel(x,y);
+        Gy = bmpModelGy.getPixel(x,y);
 
-        Ix = (Imodel(idx + 1) - Imodel(idx - 1)) / 2;
-        Iy = (Imodel(idx + 1) - Imodel(idx - 1)) / 2;
-
-        res = Ix * s[idx * 3][i] + Iy * s[idx * 3 + 2][i];
+        res = Gx * s[idx * 3][i] + Gy * s[idx * 3 + 2][i];
 
         return res;
+    }
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /////////////////////////////////// Apply Sobel Filter /////////////////////////////////////////
+    private Bitmap computeSobelGx(Bitmap srcBmp) {
+        // variables
+        Mat src = new Mat();
+        Bitmap dstBmp = Bitmap.createBitmap(srcBmp.getWidth(),
+                srcBmp.getHeight(), Bitmap.Config.ARGB_8888);
+
+        // convert Bmp to Mat
+        Utils.bitmapToMat(srcBmp, src);
+
+        SobelFilterGx sobelGx = new SobelFilterGx();
+        sobelGx.apply(src, src);
+
+        Utils.matToBitmap(src, dstBmp);
+
+        return dstBmp;
+    }
+
+    private Bitmap computeSobelGy(Bitmap srcBmp) {
+        // variables
+        Mat src = new Mat();
+        Bitmap dstBmp = Bitmap.createBitmap(srcBmp.getWidth(),
+                srcBmp.getHeight(), Bitmap.Config.ARGB_8888);
+
+        // convert Bmp to Mat
+        Utils.bitmapToMat(srcBmp, src);
+
+        SobelFilterGy sobelGy = new SobelFilterGy();
+        sobelGy.apply(src, src);
+
+        Utils.matToBitmap(src, dstBmp);
+
+        return dstBmp;
     }
     ////////////////////////////////////////////////////////////////////////////////////////////////
 

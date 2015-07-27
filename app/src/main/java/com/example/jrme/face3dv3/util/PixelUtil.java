@@ -73,4 +73,37 @@ public class PixelUtil {
             }
         }
     }
+
+    /*
+    * Get the max values pixel correspondent to x and y coordinate in the list
+    * For x and y float coordinates
+    */
+    public static float[] getMaxMin(List<Pixel> list){
+        float maxX = 0.0f, maxY = 0.0f, minX = 0.0f, minY = 0.0f;
+        float[] res = new float[4];
+
+        for(Pixel p : list){
+
+            if ( p.getXF() > maxX){
+                maxX = p.getXF();
+            }
+            if ( p.getYF() > maxY){
+                maxY = p.getYF();
+            }
+
+            if ( p.getXF() < minX){
+                minX = p.getXF();
+            }
+            if ( p.getYF() < minY){
+                minY = p.getYF();
+            }
+        }
+        res[0] = maxX;
+        res[1] = minX;
+        res[2] = maxY;
+        res[3] = minY;
+
+        return res;
+    }
+
 }

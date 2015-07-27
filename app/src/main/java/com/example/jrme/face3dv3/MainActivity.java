@@ -33,6 +33,9 @@ import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import com.example.jrme.face3dv3.filters.convolution.SobelFilterGx;
+import com.example.jrme.face3dv3.filters.convolution.SobelFilterGy;
 import com.example.jrme.face3dv3.fitting.CostFunction;
 import com.example.jrme.face3dv3.util.IOHelper;
 import com.example.jrme.face3dv3.util.MyProcrustes;
@@ -44,6 +47,12 @@ import org.apache.commons.math3.linear.Array2DRowRealMatrix;
 import org.apache.commons.math3.linear.RealMatrix;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.opencv.android.BaseLoaderCallback;
+import org.opencv.android.LoaderCallbackInterface;
+import org.opencv.android.OpenCVLoader;
+import org.opencv.android.Utils;
+import org.opencv.core.Mat;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -58,12 +67,15 @@ import static com.example.jrme.face3dv3.util.IOHelper.fileSize;
 import static com.example.jrme.face3dv3.util.IOHelper.readBin2DShapetoMatrix;
 import static com.example.jrme.face3dv3.util.IOHelper.readBinFloatDoubleArray;
 import static com.example.jrme.face3dv3.util.IOHelper.writeBinFloat;
+import static com.example.jrme.face3dv3.util.ImageHelper.fillHole1;
+import static com.example.jrme.face3dv3.util.ImageHelper.fillHole2;
 import static com.example.jrme.face3dv3.util.ImageHelper.saveBitmaptoPNG;
 import static com.example.jrme.face3dv3.util.MatrixHelper.centroid;
 import static com.example.jrme.face3dv3.util.MatrixHelper.translate;
 
 import static com.example.jrme.face3dv3.util.IOHelper.readBinModel83Pt2DFloat;
 import static com.example.jrme.face3dv3.util.IOHelper.readBinFloat;
+import static com.example.jrme.face3dv3.util.PixelUtil.getMaxMin;
 
 /**
  * Get a picture form your phone<br />
@@ -121,6 +133,22 @@ public class MainActivity extends Activity {
     private static final int NUM_CASES = fileSize(TEXTURE_DIRECTORY, AVERAGE_TEXTURE_FILE)/BYTES_PER_FLOAT;
 
     private float[] modelShape;
+
+    // The OpenCV loader callback.
+    private BaseLoaderCallback mLoaderCallback =
+            new BaseLoaderCallback(this) {
+                @Override
+                public void onManagerConnected(final int status) {
+                    switch (status) {
+                        case LoaderCallbackInterface.SUCCESS:
+                            Log.d(TAG, "OpenCV loaded successfully");
+                            break;
+                        default:
+                            super.onManagerConnected(status);
+                            break;
+                    }
+                }
+            };
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -612,58 +640,90 @@ public class MainActivity extends Activity {
                     for(int i=0, idx=0; i<NUM_CASES; i=i+3,idx++){
                         //get r g b and x y
                         int rgb = Color.rgb((int) averageTexture[i], (int) averageTexture[i + 1], (int) averageTexture[i + 2]);
-                        Pixel p = new Pixel((int) averageShape[i], (int) averageShape[i + 2], rgb);
+                        Pixel p = new Pixel(averageShape[i], averageShape[i + 2], rgb); // x and y here are FLOAT
                         averagePixels.add(idx, p);
                     }
                     ////////////////////////////////////////////////////////////////////////////////
 
                     // create an image of the model face ///////////////////////////////////////////
-                    int w = 474, h = 600;
+                    int w = 250, h = 250;
                     Bitmap bmpModel = Bitmap.createBitmap(w, h,
                             Bitmap.Config.ARGB_8888); // this creates a MUTABLE bitmap
-                    for (Pixel p : averagePixels) {
-                        bmpModel.setPixel(w - (p.getX() + w/2) ,h - (p.getY() + h/2) // rotate 90 and center
-                                ,p.getRGB());
-                    }
-                    saveBitmaptoPNG(TEXTURE_DIRECTORY, "averageFace2D.png", bmpModel); //save
+                    float[] maxMin = getMaxMin(averagePixels);
+                    Log.d(TAG," max X = "+ maxMin[0]);
+                    Log.d(TAG," min X = "+ maxMin[1]);
+                    Log.d(TAG," max Y = "+ maxMin[2]);
+                    Log.d(TAG, " min Y = " + maxMin[3]);
+                    int[][] indexOfModel = new int[averagePixels.size()][2];
+                    int idx = 0;
 
-                    //JPG to Bitmap to MAT
-                    Bitmap i = BitmapFactory.decodeFile(imgPath + "mms.jpg");
-                    Bitmap bmpImg = i.copy(Bitmap.Config.ARGB_8888, false);
-                    Mat srcMat = new Mat ( bmpImg.getHeight(), bmpImg.getWidth(), CvType.CV_8UC3);
-                    Utils.bitmapToMat(bmpImg, srcMat);
+                    for (Pixel p : averagePixels) {
+                        float a = p.getXF();
+                        float b = p.getYF();
+                        int x = (int) ((250-1) * ( p.getXF() - maxMin[1])/ (maxMin[0] - maxMin[1]));
+                        int y = (int) ((250-1) * ( p.getYF() - maxMin[3]) / (maxMin[2] - maxMin[3]));
+                        indexOfModel[idx][0] = x;
+                        indexOfModel[idx][1] = y;
+                        idx++;
+                        try{
+                            bmpModel.setPixel( x, y, p.getRGB());
+                        } catch(Exception e){
+                            Log.e(TAG, "a = " + a);
+                            Log.e(TAG, "b = " + b);
+                            Log.e(TAG, "x = " + x);
+                            Log.e(TAG, "y = " + y);
+                            throw new IllegalArgumentException("Out of border");
+                        }
+                    }
+                    // fill the pixels hole
+                    fillHole1(bmpModel);
+                    fillHole2(bmpModel);
+                    fillHole2(bmpModel);
+
+                    saveBitmaptoPNG(TEXTURE_DIRECTORY, "modelFace2D.png", bmpModel); //save
+                    ////////////////////////////////////////////////////////////////////////////////
+
+                    //// Apply Sobel Filter ////////////////////////////////////////////////////////
+                    Bitmap bmpModelGx = computeSobelGx(bmpModel);
+                    Bitmap bmpModelGy = computeSobelGy(bmpModel);
+
+                    saveBitmaptoPNG(TEXTURE_DIRECTORY, "modelFace2DGx.png", bmpModelGx); //save
+                    saveBitmaptoPNG(TEXTURE_DIRECTORY, "modelFace2DGy.png", bmpModelGy); //save
                     ////////////////////////////////////////////////////////////////////////////////
 
                     // it was just for checking both list in a txt file
                     //writePixels("3DFace/AverageFaceData", "facePixels.txt", facePixels);
                     //writePixels("3DFace/AverageFaceData","averagePixels.txt",averagePixels);
-/*
-                    //compute Cost Function ////////////////////////////////////////////////////////
+
                     float [][] s = readBinFloatDoubleArray(SHAPE_DIRECTORY,
                             FEATURE_S_FILE, 192420, 60); //BIG
                     Log.d(TAG,"facePixels size = "+facePixels.size());
                     Log.d(TAG,"averagePixels size = "+ averagePixels.size());
-                    CostFunction costFunc =  new CostFunction(facePixels,averagePixels,
-                            xBedMatrix,xResult, s);
-                    float[] alpha = costFunc.getAlpha();
-                    ////////////////////////////////////////////////////////////////////////////////
 
-                    // build the 3DMM using alpha values ///////////////////////////////////////////
-                    float res1 = 0.0f, res2 = 0.0f, res3 = 0.0f;
-                    modelShape = new float[NUM_CASES];
-                    for(int i=0; i<NUM_CASES; i=i+3){
+                    // compute Cost Function 10 times  /////////////////////////////////////////////
+                    for(int it = 0; it < 1; it++){
+                        CostFunction costFunc =  new CostFunction(facePixels,averagePixels,
+                                xBedMatrix,xResult, s, bmpModel, indexOfModel);
+                        float[] alpha = costFunc.getAlpha();
 
-                        for(int a=0; a <60; a++){
-                            res1 += alpha[a] * s[i][a];
-                            res2 += alpha[a] * s[i + 1][a];
-                            res3 += alpha[a] * s[i +2][a];
+                        // build the 3DMM using alpha values ///////////////////////////////////////
+                        float res1 = 0.0f, res2 = 0.0f, res3 = 0.0f;
+                        modelShape = new float[NUM_CASES];
+                        for(int i=0; i<NUM_CASES; i=i+3){
+
+                            for(int a=0; a <60; a++){
+                                res1 += alpha[a] * s[i][a];
+                                res2 += alpha[a] * s[i + 1][a];
+                                res3 += alpha[a] * s[i +2][a];
+                            }
+                            modelShape[i] = averageShape[i] + res1;
+                            modelShape[i+1] = averageShape[i+1] + res2;
+                            modelShape[i+2] = averageShape[i+2] + res3;
                         }
-                        modelShape[i] = averageShape[i] + res1;
-                        modelShape[i+1] = averageShape[i+1] + res2;
-                        modelShape[i+2] = averageShape[i+2] + res3;
+                        ////////////////////////////////////////////////////////////////////////////
                     }
                     ////////////////////////////////////////////////////////////////////////////////
-*/
+
                     msg = mHandler.obtainMessage(EXTRACT_OK);
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -831,6 +891,8 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_2_4_11,
+                this, mLoaderCallback);
         Log.d(TAG, "onResume");
     }
 
@@ -856,5 +918,39 @@ public class MainActivity extends Activity {
         if (imgBeforeDetect != null) {
             imgBeforeDetect.recycle();
         }
+    }
+
+    private Bitmap computeSobelGx(Bitmap srcBmp) {
+
+        // variables
+        Mat src = new Mat();
+        Bitmap dstBmp = Bitmap.createBitmap(srcBmp.getWidth(),srcBmp.getHeight(),Bitmap.Config.ARGB_8888);
+
+        // convert Bmp to Mat
+        Utils.bitmapToMat(srcBmp, src);
+
+        SobelFilterGx sobelGx = new SobelFilterGx();
+        sobelGx.apply(src, src);
+
+        Utils.matToBitmap(src, dstBmp);
+
+        return dstBmp;
+    }
+
+    private Bitmap computeSobelGy(Bitmap srcBmp) {
+
+        // variables
+        Mat src = new Mat();
+        Bitmap dstBmp = Bitmap.createBitmap(srcBmp.getWidth(),srcBmp.getHeight(),Bitmap.Config.ARGB_8888);
+
+        // convert Bmp to Mat
+        Utils.bitmapToMat(srcBmp, src);
+
+        SobelFilterGy sobelGy = new SobelFilterGy();
+        sobelGy.apply(src, src);
+
+        Utils.matToBitmap(src, dstBmp);
+
+        return dstBmp;
     }
 }
