@@ -13,10 +13,10 @@ import org.opencv.imgproc.Imgproc;
 public class SobelFilterGy implements Filter{
     private final int scale = 1;
     private final int delta = 0;
-  //  private final int ddepth = CvType.CV_16S;
-    private final int ddepth = CvType.CV_64F;
+    private final int ddepth = CvType.CV_16S;
 
     private final Mat src_gray = new Mat();
+    private final Mat grad_y = new Mat();
 
     @Override
     public void apply(final Mat src, Mat dst) {
@@ -28,8 +28,13 @@ public class SobelFilterGy implements Filter{
         Imgproc.cvtColor(src, src_gray, Imgproc.COLOR_RGB2GRAY);
 
         /// Gradient Y
-        Imgproc.Sobel(src_gray, dst, ddepth, 0, 1, 3, scale, delta, Imgproc.BORDER_DEFAULT);
+        Imgproc.Sobel(src_gray, grad_y, ddepth, 0, 1, 3, scale, delta, Imgproc.BORDER_DEFAULT);
 
-        dst.convertTo(dst, CvType.CV_8U);
+        grad_y.convertTo(dst, CvType.CV_8U);
+    }
+
+    // this amtrix contains positive and negative values we want
+    public Mat getGrad_y() {
+        return grad_y;
     }
 }

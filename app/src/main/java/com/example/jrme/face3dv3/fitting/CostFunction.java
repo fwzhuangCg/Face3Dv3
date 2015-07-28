@@ -1,6 +1,7 @@
 package com.example.jrme.face3dv3.fitting;
 
 import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.nfc.Tag;
 import android.util.Log;
 
@@ -21,6 +22,7 @@ import java.util.Random;
 import static com.example.jrme.face3dv3.util.IOHelper.readBin83PtIndex;
 import static com.example.jrme.face3dv3.util.IOHelper.readBinFloat;
 import static com.example.jrme.face3dv3.util.IOHelper.readBinSFSV;
+import static com.example.jrme.face3dv3.util.ImageHelper.saveBitmaptoPNG;
 import static com.example.jrme.face3dv3.util.PixelUtil.getPixel;
 import static java.lang.Math.abs;
 import static java.lang.Math.pow;
@@ -60,9 +62,8 @@ public class CostFunction {
     private RealMatrix modelFeatPts;
     private int[] featPtsIndex;
     private int k;
-    private Bitmap bmpModelGx;
-    private Bitmap bmpModelGy;
-    private int[][] indexOfModel;
+    private Mat dxModel;
+    private Mat dyModel;
 
     // range is [ 64140/3 ; 2 * 64140/3 ] for front face
     private int start = 21380, end = 42760; // we select 500 random values within this range
@@ -70,8 +71,7 @@ public class CostFunction {
 
     /////////////////////////////////// Constructor ////////////////////////////////////////////////
     public CostFunction(List<Pixel> input, List<Pixel> model,
-                        RealMatrix inputFeatPts, RealMatrix modelFeatPts, float [][] eigenVectors
-            , Bitmap bmpModel, int[][] indexOfModel) {
+                        RealMatrix inputFeatPts, RealMatrix modelFeatPts, float [][] eigenVectors, Bitmap bmpModel) {
 
         this.featPtsIndex = readBin83PtIndex(CONFIG_DIRECTORY, INDEX83PT_FILE);
         this.input = input;
@@ -100,12 +100,17 @@ public class CostFunction {
         }
 
         this.s = eigenVectors;
-        this.indexOfModel = indexOfModel;
-        this.bmpModelGx = computeSobelGx(bmpModel);
-        this.bmpModelGy = computeSobelGy(bmpModel);
+
+        this.dxModel = computeSobelGx(bmpModel);
+        this.dyModel = computeSobelGy(bmpModel);
+        //saveBitmaptoPNG(TEXTURE_DIRECTORY, "modelFace2DGx.png", bmpModelGx); //save
+        //saveBitmaptoPNG(TEXTURE_DIRECTORY, "modelFace2DGy.png", bmpModelGy); //save
 
         this.alpha = computeAlpha();
 
+        this.Ei = computeEi();
+        this.Ef = computeEf();
+        this.E = computeE();
     }
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -136,7 +141,7 @@ public class CostFunction {
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
     /////////////////////////////////// Equation 17 ////////////////////////////////////////////////
-    private float computeEi(List<Pixel> input, List<Pixel> model){
+    private float computeEi(){
         float res = 0.0f;
 
         for(int idx : randomList) {
@@ -147,7 +152,7 @@ public class CostFunction {
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
     /////////////////////////////////// Equation 18 ////////////////////////////////////////////////
-    private float computeEf(RealMatrix inputFeatPts, RealMatrix modelFeatPts){
+    private float computeEf(){
         float res = 0.0f;
         for(int j=0; j<k; j++) {
             res += pow(inputFeatPts.getEntry(j,0) - modelFeatPts.getEntry(j,0), 2)
@@ -194,8 +199,8 @@ public class CostFunction {
 
         for(int i=0; i<60-1; i++){
 
-            Log.d(TAG,"compute alpha, i = "+ i);
-            Log.d(TAG,"alpha[" + i + "] = " + res[i]);
+            //Log.d(TAG,"compute alpha, i = "+ i);
+            //Log.d(TAG,"alpha[" + i + "] = " + res[i]);
 
             // collect 500 random vertices each iteration
             Random r = new Random();
@@ -230,9 +235,9 @@ public class CostFunction {
             res[i+1] = res[i] + lambda * (alphaStar[i] - res[i]); // iteration
         }
 
-        int last = res.length - 1;
-        Log.d(TAG,"compute alpha, i = "+ last);
-        Log.d(TAG,"alpha[" + last + "] = " + res[last]);
+        //int last = res.length - 1;
+        //Log.d(TAG,"compute alpha, i = "+ last);
+        //Log.d(TAG,"alpha[" + last + "] = " + res[last]);
 
         return res;
     }
@@ -270,6 +275,7 @@ public class CostFunction {
         return Imodel + tmp;
     }
 
+    // Not use
     private float Imodel(int x, int y){
         float Imodel, tmp = 0.0f;
         int l = 1; // precision for finding pixel in the list // x = x + l or x - l, same for y
@@ -322,13 +328,11 @@ public class CostFunction {
             yA = (float) modelFeatPts.getEntry(j,1);
 
             for(int a =0; a < 60; a++){
-                //tmp += alpha_i * (s[featPtsIndex[j] * 3][a] + s[featPtsIndex[j] * 3 + 2][a]);
                 tmp += alpha_i * (subFSV[i][a][0] + subFSV[i][a][2]);
             }
             res += -2.0f
                     * ((xIn + yIn) - (xA + yA) - tmp)
                     * alpha_i
-                    //* (s[featPtsIndex[j] * 3][i] + s[featPtsIndex[j] * 3 + 2][i]);
                     * (subFSV[i][j][0] + subFSV[i][j][2]);
         }
         return res;
@@ -337,19 +341,20 @@ public class CostFunction {
     private float deriv2Ef(int i, float alpha_i){
         float res = 0.0f;
         for(int j=0; j<k; j++) {
-            //res += -2.0f * alpha_i * (s[featPtsIndex[j] * 3][i] + s[featPtsIndex[j] * 3 + 2][i]);
             res += -2.0f * alpha_i * (subFSV[i][j][0] + subFSV[i][j][2]);
         }
         return res;
     }
 
     private float derivImodel(int i, int idx){
-        float Gx, Gy, res;
-        int x = indexOfModel[idx][0];
-        int y = indexOfModel[idx][1];
+        float Gx, Gy;
+        float res;
 
-        Gx = bmpModelGx.getPixel(x,y);
-        Gy = bmpModelGy.getPixel(x,y);
+        int x = model.get(idx).getX();
+        int y = model.get(idx).getY();
+
+        Gx = (float) dxModel.get(x,y)[0];
+        Gy = (float) dyModel.get(x,y)[0];
 
         res = Gx * s[idx * 3][i] + Gy * s[idx * 3 + 2][i];
 
@@ -358,7 +363,7 @@ public class CostFunction {
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
     /////////////////////////////////// Apply Sobel Filter /////////////////////////////////////////
-    private Bitmap computeSobelGx(Bitmap srcBmp) {
+    private Mat computeSobelGx(Bitmap srcBmp) {
         // variables
         Mat src = new Mat();
         Bitmap dstBmp = Bitmap.createBitmap(srcBmp.getWidth(),
@@ -370,12 +375,10 @@ public class CostFunction {
         SobelFilterGx sobelGx = new SobelFilterGx();
         sobelGx.apply(src, src);
 
-        Utils.matToBitmap(src, dstBmp);
-
-        return dstBmp;
+        return sobelGx.getGrad_x();
     }
 
-    private Bitmap computeSobelGy(Bitmap srcBmp) {
+    private Mat computeSobelGy(Bitmap srcBmp) {
         // variables
         Mat src = new Mat();
         Bitmap dstBmp = Bitmap.createBitmap(srcBmp.getWidth(),
@@ -387,9 +390,7 @@ public class CostFunction {
         SobelFilterGy sobelGy = new SobelFilterGy();
         sobelGy.apply(src, src);
 
-        Utils.matToBitmap(src, dstBmp);
-
-        return dstBmp;
+        return sobelGy.getGrad_y();
     }
     ////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -9,24 +9,27 @@ import java.util.List;
  */
 public class Pixel {
 
-    /** valeur du pixel */
-    private int rgb;
+    /** Pixel values */
 
+    // x and y coordinate in an image
     private int x;
     private int y;
 
+    // xF and yF coordinate in the shape file
     private float xF;
     private float yF;
 
+    // color values
+    private int rgb;
     private float r;
     private float g;
     private float b;
 
     /**
-     * Construction du pixel par interpolation.
-     * @param x abscisse initiale
-     * @param y ordonee initiale
-     * @param rgb valeur du pixel
+     * 1st Constructor of a Pixel in an image
+     * @param x pixel location (int)
+     * @param y pixel location (int)
+     * @param rgb color value
      */
     public Pixel(int x,int y,int rgb)
     {
@@ -41,12 +44,12 @@ public class Pixel {
     }
 
     /**
-     * Construction du pixel par interpolation.
-     * @param x abscisse initiale
-     * @param y ordonee initiale
-     * @param rgb valeur du pixel
+     * 2nd Constructor of a Pixel from shape file values
+     * @param xF (float)
+     * @param yF (float)
+     * @param rgb color value
      */
-    public Pixel(float x,float y,int rgb)
+    public Pixel(float xF,float yF,int rgb)
     {
         // Enregistrement de la couleur
         this.rgb = rgb;
@@ -54,33 +57,10 @@ public class Pixel {
         this.g = Color.green(rgb);
         this.b = Color.blue(rgb);
 
-        this.xF = x;
-        this.yF = y;
+        this.xF = xF;
+        this.yF = yF;
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-
-        Pixel pixel = (Pixel) o;
-
-        if (rgb != pixel.rgb) return false;
-        if (x != pixel.x) return false;
-        return y == pixel.y;
-    }
-
-    @Override
-    public int hashCode() {
-        int result = rgb;
-        result = 31 * result + x;
-        result = 31 * result + y;
-        return result;
-    }
-
-    public int getRGB() {
-        return rgb;
-    }
 
     public int getX() {
         return x;
@@ -98,6 +78,10 @@ public class Pixel {
         return yF;
     }
 
+    public int getRGB() {
+        return rgb;
+    }
+
     public float getR() {
         return r;
     }
@@ -110,4 +94,33 @@ public class Pixel {
         return b;
     }
 
+    public void setY(int y) {
+        this.y = y;
+    }
+
+    public void setX(int x) {
+        this.x = x;
+    }
+
+    // Not use
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        Pixel pixel = (Pixel) o;
+
+        if (rgb != pixel.rgb) return false;
+        if (x != pixel.x) return false;
+        return y == pixel.y;
+    }
+
+    // Not use
+    @Override
+    public int hashCode() {
+        int result = rgb;
+        result = 31 * result + x;
+        result = 31 * result + y;
+        return result;
+    }
 }

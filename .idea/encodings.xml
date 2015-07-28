@@ -2,21 +2,8 @@
 <project version="4">
   <component name="Encoding">
     <file url="file://$PROJECT_DIR$/app/src/main/java/com/example/jrme/face3dv3/filters/Filter.java" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/app/src/main/java/com/example/jrme/face3dv3/filters/NoneFilter.java" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/app/src/main/java/com/example/jrme/face3dv3/filters/convolution/CentralDifferenceFxFilter.java" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/app/src/main/java/com/example/jrme/face3dv3/filters/convolution/CentralDifferenceFyFilter.java" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/app/src/main/java/com/example/jrme/face3dv3/filters/convolution/GrayLevelFilter.java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/app/src/main/java/com/example/jrme/face3dv3/filters/convolution/SobelFilter.java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/app/src/main/java/com/example/jrme/face3dv3/filters/convolution/SobelFilterGx.java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/app/src/main/java/com/example/jrme/face3dv3/filters/convolution/SobelFilterGy.java" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/app/src/main/java/com/example/jrme/face3dv3/filters/convolution/StrokeEdgesFilter.java" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/app/src/main/java/com/example/jrme/face3dv3/filters/curve/CrossProcessCurveFilter.java" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/app/src/main/java/com/example/jrme/face3dv3/filters/curve/CurveFilter.java" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/app/src/main/java/com/example/jrme/face3dv3/filters/curve/PortraCurveFilter.java" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/app/src/main/java/com/example/jrme/face3dv3/filters/curve/ProviaCurveFilter.java" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/app/src/main/java/com/example/jrme/face3dv3/filters/curve/VelviaCurveFilter.java" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/app/src/main/java/com/example/jrme/face3dv3/filters/mixer/RecolorCMVFilter.java" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/app/src/main/java/com/example/jrme/face3dv3/filters/mixer/RecolorRCFilter.java" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/app/src/main/java/com/example/jrme/face3dv3/filters/mixer/RecolorRGVFilter.java" charset="UTF-8" />
   </component>
 </project>

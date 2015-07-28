@@ -117,7 +117,7 @@ public class MainActivity extends Activity {
     private float[][] initialPoints = new float[83][2];
     float rollAngle = 0.0f;
 
-    List<Pixel> facePixels, averagePixels;
+    List<Pixel> facePixels, modelPixels;
 
     private static final String CONFIG_DIRECTORY = "3DFace/DMM/config";
     private static final String MODEL_2D_83PT_FILE = "ModelPoints2D.dat";
@@ -132,7 +132,7 @@ public class MainActivity extends Activity {
 
     private static final int NUM_CASES = fileSize(TEXTURE_DIRECTORY, AVERAGE_TEXTURE_FILE)/BYTES_PER_FLOAT;
 
-    private float[] modelShape;
+    private float[] modelShapeFinal;
 
     // The OpenCV loader callback.
     private BaseLoaderCallback mLoaderCallback =
@@ -562,14 +562,6 @@ public class MainActivity extends Activity {
                     RealMatrix T = mProc.getT();
                     Log.d(TAG, "T = " + T);
 
-                    // load the 2D average shape
-                    /*int cases = fileSize("3DFace/AverageFaceData/BinFiles",
-                            "averageFace2DNotScaled.dat") / BYTES_PER_FLOAT;
-                    int k = cases / 2; // Number of Lines == Row Dimension
-                    RealMatrix averageShape2D =
-                            IOHelper.readBin2DShapetoMatrix("3DFace/AverageFaceData/BinFiles",
-                                    "averageFace2DNotScaled.dat", k);
-                                    */
                     int cases = fileSize("3DFace/AverageFaceData/BinFiles",
                             "averageFace2DNotScaled.dat") / BYTES_PER_FLOAT;
                     int k = cases / 2; // Number of Lines == Row Dimension
@@ -609,12 +601,13 @@ public class MainActivity extends Activity {
                         try {
                             int x = (int) Math.ceil(res.getEntry(i, 0));
                             int y = (int) Math.ceil(res.getEntry(i, 1));
-                            Pixel p = new Pixel(x, y, imgBeforeDetect.getPixel(x, y));
+                            Pixel p = new Pixel(x, y, imgBeforeDetect.getPixel(x, y)); // 1st constructor x and y
                             facePixels.add(i, p);
                         } catch (Exception e) {
                             Log.d(TAG, "Outside of the image");
                         }
                     }
+                    Log.d(TAG,"facePixels size = "+facePixels.size());
 
                     //draw on white face
                     for (Pixel p : facePixels) {
@@ -630,85 +623,115 @@ public class MainActivity extends Activity {
                         }
                     });
 
-                    // build averagePixels /////////////////////////////////////////////////////////
-                    float[] averageTexture = readBinFloat(TEXTURE_DIRECTORY, AVERAGE_TEXTURE_FILE, NUM_CASES);
-                    float[] averageShape = readBinFloat(SHAPE_DIRECTORY, AVERAGE_SHAPE_FILE, NUM_CASES);
-                    Log.d(TAG,"NUM CASES = "+ NUM_CASES);
-                    Log.d(TAG,"averageTexture size = "+ averageTexture.length);
-                    Log.d(TAG,"averageShape size = "+ averageShape.length);
-                    averagePixels = new ArrayList<>();
-                    for(int i=0, idx=0; i<NUM_CASES; i=i+3,idx++){
-                        //get r g b and x y
-                        int rgb = Color.rgb((int) averageTexture[i], (int) averageTexture[i + 1], (int) averageTexture[i + 2]);
-                        Pixel p = new Pixel(averageShape[i], averageShape[i + 2], rgb); // x and y here are FLOAT
-                        averagePixels.add(idx, p);
-                    }
-                    ////////////////////////////////////////////////////////////////////////////////
-
-                    // create an image of the model face ///////////////////////////////////////////
-                    int w = 250, h = 250;
-                    Bitmap bmpModel = Bitmap.createBitmap(w, h,
-                            Bitmap.Config.ARGB_8888); // this creates a MUTABLE bitmap
-                    float[] maxMin = getMaxMin(averagePixels);
-                    Log.d(TAG," max X = "+ maxMin[0]);
-                    Log.d(TAG," min X = "+ maxMin[1]);
-                    Log.d(TAG," max Y = "+ maxMin[2]);
-                    Log.d(TAG, " min Y = " + maxMin[3]);
-                    int[][] indexOfModel = new int[averagePixels.size()][2];
-                    int idx = 0;
-
-                    for (Pixel p : averagePixels) {
-                        float a = p.getXF();
-                        float b = p.getYF();
-                        int x = (int) ((250-1) * ( p.getXF() - maxMin[1])/ (maxMin[0] - maxMin[1]));
-                        int y = (int) ((250-1) * ( p.getYF() - maxMin[3]) / (maxMin[2] - maxMin[3]));
-                        indexOfModel[idx][0] = x;
-                        indexOfModel[idx][1] = y;
-                        idx++;
-                        try{
-                            bmpModel.setPixel( x, y, p.getRGB());
-                        } catch(Exception e){
-                            Log.e(TAG, "a = " + a);
-                            Log.e(TAG, "b = " + b);
-                            Log.e(TAG, "x = " + x);
-                            Log.e(TAG, "y = " + y);
-                            throw new IllegalArgumentException("Out of border");
-                        }
-                    }
-                    // fill the pixels hole
-                    fillHole1(bmpModel);
-                    fillHole2(bmpModel);
-                    fillHole2(bmpModel);
-
-                    saveBitmaptoPNG(TEXTURE_DIRECTORY, "modelFace2D.png", bmpModel); //save
-                    ////////////////////////////////////////////////////////////////////////////////
-
-                    //// Apply Sobel Filter ////////////////////////////////////////////////////////
-                    Bitmap bmpModelGx = computeSobelGx(bmpModel);
-                    Bitmap bmpModelGy = computeSobelGy(bmpModel);
-
-                    saveBitmaptoPNG(TEXTURE_DIRECTORY, "modelFace2DGx.png", bmpModelGx); //save
-                    saveBitmaptoPNG(TEXTURE_DIRECTORY, "modelFace2DGy.png", bmpModelGy); //save
-                    ////////////////////////////////////////////////////////////////////////////////
-
                     // it was just for checking both list in a txt file
                     //writePixels("3DFace/AverageFaceData", "facePixels.txt", facePixels);
-                    //writePixels("3DFace/AverageFaceData","averagePixels.txt",averagePixels);
+                    //writePixels("3DFace/AverageFaceData","modelPixels.txt",modelPixels);
 
                     float [][] s = readBinFloatDoubleArray(SHAPE_DIRECTORY,
                             FEATURE_S_FILE, 192420, 60); //BIG
-                    Log.d(TAG,"facePixels size = "+facePixels.size());
-                    Log.d(TAG,"averagePixels size = "+ averagePixels.size());
 
-                    // compute Cost Function 10 times  /////////////////////////////////////////////
-                    for(int it = 0; it < 1; it++){
-                        CostFunction costFunc =  new CostFunction(facePixels,averagePixels,
-                                xBedMatrix,xResult, s, bmpModel, indexOfModel);
+                    ////////////////////////////////////////////////////////////////////////////////
+                    // Compute Cost Function 10 times  ///// Core of the program ///////////////////
+                    ////////////////////////////////////////////////////////////////////////////////
+
+                    // Initialisation
+                    float[] modelTexture, modelShape;
+                    modelShapeFinal = new float[NUM_CASES];
+                    modelPixels = new ArrayList<>();
+
+                    // Iteration
+                    for(int it = 0; it < 10; it++){
+
+                        // First iteration we load the Average Face ////////////////////////////////
+                        if(it == 0){
+
+                            modelTexture = readBinFloat(TEXTURE_DIRECTORY, AVERAGE_TEXTURE_FILE, NUM_CASES);
+                            modelShape = readBinFloat(SHAPE_DIRECTORY, AVERAGE_SHAPE_FILE, NUM_CASES);
+                            Log.d(TAG,"NUM CASES = "+ NUM_CASES);
+                            Log.d(TAG,"averageTexture size = "+ modelTexture.length);
+                            Log.d(TAG,"averageShape size = "+ modelShape.length);
+                            for(int i=0, idx=0; i<NUM_CASES; i=i+3,idx++){
+                                //get r g b and x y
+                                int rgb = Color.rgb((int) modelTexture[i], (int) modelTexture[i + 1], (int) modelTexture[i + 2]);
+                                Pixel p = new Pixel(modelShape[i], modelShape[i + 2], rgb); // 2nd constructor with xF and yF
+                                modelPixels.add(idx, p);
+                            }
+                            Log.d(TAG,"averagePixels size = "+ modelPixels.size());
+                            Log.d(TAG,"Average Face load successfully");
+                        }
+                        // Next iteration we use the previous calculated Model Shape ///////////////
+                        else{
+
+                            modelShape = modelShapeFinal;
+                            Log.d(TAG,"NUM CASES = "+ NUM_CASES);
+                            Log.d(TAG,"modelShape size = "+ modelShape.length);
+                            for(int i=0, idx=0; i<NUM_CASES; i=i+3,idx++){
+                                //get r g b and x y
+                                int rgb = facePixels.get(idx).getRGB(); // this time we use the input face texture
+                                Pixel p = new Pixel(modelShape[i], modelShape[i + 2], rgb); // 2nd constructor with xF and yF
+                                modelPixels.set(idx, p); // set this time
+                            }
+                            Log.d(TAG,"modelPixels size = "+ modelPixels.size());
+                            Log.d(TAG,"Model Face load successfully");
+                        }
+                        ////////////////////////////////////////////////////////////////////////////
+
+                        // Create an image of the Model Face ///////////////////////////////////////
+                        int w = 250, h = 250;
+                        Bitmap bmpModel = Bitmap.createBitmap(w, h,
+                                Bitmap.Config.ARGB_8888); // this creates a MUTABLE bitmap
+                        float[] maxMin = getMaxMin(modelPixels);
+                        Log.d(TAG," max X = "+ maxMin[0]);
+                        Log.d(TAG," min X = "+ maxMin[1]);
+                        Log.d(TAG," max Y = "+ maxMin[2]);
+                        Log.d(TAG, " min Y = " + maxMin[3]);
+
+                        for (Pixel p : modelPixels) {
+                            float a = p.getXF();
+                            float b = p.getYF();
+                            int x = (int) ((250-1) * ( p.getXF() - maxMin[1])/ (maxMin[0] - maxMin[1]));
+                            int y = (int) ((250-1) * ( p.getYF() - maxMin[3]) / (maxMin[2] - maxMin[3]));
+
+                            // set the pixel location (int) of model image
+                            p.setX(x);
+                            p.setY(y);
+                            try{
+                                bmpModel.setPixel( x, y, p.getRGB());
+                            } catch(Exception e){
+                                // if failed => print what was wrong
+                                Log.e(TAG, "a = " + a);
+                                Log.e(TAG, "b = " + b);
+                                Log.e(TAG, "x = " + x);
+                                Log.e(TAG, "y = " + y);
+                                throw new IllegalArgumentException("Out of border");
+                            }
+                        }
+                        // fill the pixels hole
+                        fillHole1(bmpModel);
+                        fillHole2(bmpModel);
+                        fillHole2(bmpModel);
+
+                        saveBitmaptoPNG(TEXTURE_DIRECTORY, "modelFace2D.png", bmpModel); //save
+                        ////////////////////////////////////////////////////////////////////////////
+/*
+                        // Apply sobel
+                        Bitmap sobelGx = BmpSobelGx(bmpModel);
+                        Bitmap sobelGy = BmpSobelGy(bmpModel);
+
+                        saveBitmaptoPNG(TEXTURE_DIRECTORY, "modelFace2DGx.png", sobelGx); //save
+                        saveBitmaptoPNG(TEXTURE_DIRECTORY, "modelFace2DGy.png", sobelGy); //save
+*/
+                        // Build Cost Function /////////////////////////////////////////////////////
+                        CostFunction costFunc =  new CostFunction(facePixels, modelPixels,
+                                xBedMatrix,xResult, s, bmpModel);
                         float[] alpha = costFunc.getAlpha();
+                        Log.d(TAG," Ei = "+ costFunc.getEi());
+                        Log.d(TAG," Ef = "+ costFunc.getEf());
+                        Log.d(TAG," E = "+ costFunc.getE());
+                        ////////////////////////////////////////////////////////////////////////////
 
-                        // build the 3DMM using alpha values ///////////////////////////////////////
+                        // Build the 3DMM using Alpha values ///////////////////////////////////////
                         float res1 = 0.0f, res2 = 0.0f, res3 = 0.0f;
-                        modelShape = new float[NUM_CASES];
                         for(int i=0; i<NUM_CASES; i=i+3){
 
                             for(int a=0; a <60; a++){
@@ -716,12 +739,18 @@ public class MainActivity extends Activity {
                                 res2 += alpha[a] * s[i + 1][a];
                                 res3 += alpha[a] * s[i +2][a];
                             }
-                            modelShape[i] = averageShape[i] + res1;
-                            modelShape[i+1] = averageShape[i+1] + res2;
-                            modelShape[i+2] = averageShape[i+2] + res3;
+                            modelShapeFinal[i] = modelShape[i] + res1;
+                            modelShapeFinal[i+1] = modelShape[i+1] + res2;
+                            modelShapeFinal[i+2] = modelShape[i+2] + res3;
                         }
                         ////////////////////////////////////////////////////////////////////////////
+
+                        // Free resources
+                        bmpModel.recycle();
                     }
+
+                    ////////////////////////////////////////////////////////////////////////////////
+                    ////////////////////////////////////////////////////////////////////////////////
                     ////////////////////////////////////////////////////////////////////////////////
 
                     msg = mHandler.obtainMessage(EXTRACT_OK);
@@ -749,7 +778,7 @@ public class MainActivity extends Activity {
 
                 try {
                     IOHelper.convertPixelsToBin(facePixels, "3DFace/DMM/Texture/faceTexture.dat");
-                    //writeBinFloat(SHAPE_DIRECTORY, MODEL_SHAPE_FILE, modelShape);
+                    writeBinFloat(SHAPE_DIRECTORY, MODEL_SHAPE_FILE, modelShapeFinal);
                     msg = mHandler.obtainMessage(SAVE_OK);
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -920,11 +949,13 @@ public class MainActivity extends Activity {
         }
     }
 
-    private Bitmap computeSobelGx(Bitmap srcBmp) {
-
+    /*
+    /////////////////////////////////// Apply Sobel Filter /////////////////////////////////////////
+    private Bitmap BmpSobelGx(Bitmap srcBmp) {
         // variables
         Mat src = new Mat();
-        Bitmap dstBmp = Bitmap.createBitmap(srcBmp.getWidth(),srcBmp.getHeight(),Bitmap.Config.ARGB_8888);
+        Bitmap dstBmp = Bitmap.createBitmap(srcBmp.getWidth(),
+                srcBmp.getHeight(), Bitmap.Config.ARGB_8888);
 
         // convert Bmp to Mat
         Utils.bitmapToMat(srcBmp, src);
@@ -937,11 +968,11 @@ public class MainActivity extends Activity {
         return dstBmp;
     }
 
-    private Bitmap computeSobelGy(Bitmap srcBmp) {
-
+    private Bitmap BmpSobelGy(Bitmap srcBmp) {
         // variables
         Mat src = new Mat();
-        Bitmap dstBmp = Bitmap.createBitmap(srcBmp.getWidth(),srcBmp.getHeight(),Bitmap.Config.ARGB_8888);
+        Bitmap dstBmp = Bitmap.createBitmap(srcBmp.getWidth(),
+                srcBmp.getHeight(), Bitmap.Config.ARGB_8888);
 
         // convert Bmp to Mat
         Utils.bitmapToMat(srcBmp, src);
@@ -953,4 +984,6 @@ public class MainActivity extends Activity {
 
         return dstBmp;
     }
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+*/
 }
