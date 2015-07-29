@@ -11,7 +11,7 @@ import java.nio.IntBuffer;
 import org.apache.commons.math3.linear.RealMatrix;
 import org.apache.commons.math3.linear.RealVector;
 
-
+// Not used
 public class MorphableModel {
 
     private RealMatrix vertices;

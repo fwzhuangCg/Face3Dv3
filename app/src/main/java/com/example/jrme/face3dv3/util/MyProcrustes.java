@@ -51,6 +51,7 @@ public class MyProcrustes {
         /* Rotation Matrix */
         double theta = toRadians(rollAngle);
         RealMatrix R = new Array2DRowRealMatrix(2, 2);
+        // Here we need to add Pi because the Average Face 2D is upside down
         R.setEntry(0, 0, cos(theta+PI));
         R.setEntry(0, 1, sin(theta+PI));
         R.setEntry(1, 0, -sin(theta+PI));

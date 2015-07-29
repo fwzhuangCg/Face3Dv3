@@ -6,6 +6,7 @@ import android.util.Log;
 import org.apache.commons.math3.linear.Array2DRowRealMatrix;
 import org.apache.commons.math3.linear.RealMatrix;
 
+import static java.lang.Math.abs;
 import static java.lang.Math.pow;
 
 
@@ -31,6 +32,16 @@ public class MatrixHelper {
         centroid.x = sumX/k;
         centroid.y= sumY/k;
         return centroid;
+    }
+
+    /* Distance in x coordinate between start point to end point */
+    public static float deltaX(PointF start, PointF end) {
+        return abs(end.x - start.x);
+    }
+
+    /* Distance in y coordinate between start point to end point */
+    public static float deltaY(PointF start, PointF end) {
+        return abs(end.y - start.y);
     }
 
     /* Translate the matrix from start point to end point */
@@ -111,5 +122,53 @@ public class MatrixHelper {
         m[13] = 0f;
         m[14] = -((2f * f * n) / (f - n));
         m[15] = 0f;
+    }
+
+    public static float[] maxMinXYZ(float[] array){
+        float maxX = 0.0f, minX = 0.0f, maxY = 0.0f, minY = 0.0f, maxZ = 0.0f, minZ = 0.0f;
+        float[] res = new float[6];
+
+        for(int i = 0; i< array.length; i = i+ 3){
+
+            // Max
+            if ( array[i] > maxX){
+                maxX = array[i];
+            }
+            if ( array[i+1] > maxY){
+                maxY = array[i+1];
+            }
+            if ( array[i+2] > maxZ){
+                maxZ = array[i+2];
+            }
+
+            // Min
+            if ( array[i] < minX){
+                minX = array[i];
+            }
+            if ( array[i+1] < minY){
+                minY = array[i+1];
+            }
+            if ( array[i+2] < minZ){
+                minZ = array[i+2];
+            }
+        }
+        res[0] = maxX;
+        res[1] = minX;
+
+        res[2] = maxY;
+        res[3] = minY;
+
+        res[4] = maxZ;
+        res[5] = minZ;
+
+        Log.d(TAG, "maxX = "+res[0]);
+        Log.d(TAG, "minX = "+res[1]);
+
+        Log.d(TAG, "maxY = "+res[2]);
+        Log.d(TAG, "maxY = "+res[3]);
+
+        Log.d(TAG, "maxZ = "+res[4]);
+        Log.d(TAG, "minZ = "+res[5]);
+        return res;
     }
 }

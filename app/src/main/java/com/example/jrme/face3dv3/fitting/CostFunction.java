@@ -194,13 +194,13 @@ public class CostFunction {
 
         float[] res = new float[60]; // alpha
         float[] alphaStar = new float[60];
-        float num, denum, lambda = 0.0001f;
+        float num, denum, lambda = 0.0001f; // initial 0.0001f;
         res[0]= 1.0f / 60.0f; //initial value
 
         for(int i=0; i<60-1; i++){
 
-            //Log.d(TAG,"compute alpha, i = "+ i);
-            //Log.d(TAG,"alpha[" + i + "] = " + res[i]);
+            Log.d(TAG,"compute alpha, i = "+ i);
+            Log.d(TAG,"alpha[" + i + "] = " + res[i]);
 
             // collect 500 random vertices each iteration
             Random r = new Random();
@@ -235,9 +235,9 @@ public class CostFunction {
             res[i+1] = res[i] + lambda * (alphaStar[i] - res[i]); // iteration
         }
 
-        //int last = res.length - 1;
-        //Log.d(TAG,"compute alpha, i = "+ last);
-        //Log.d(TAG,"alpha[" + last + "] = " + res[last]);
+        int last = res.length - 1;
+        Log.d(TAG,"compute alpha, i = "+ last);
+        Log.d(TAG,"alpha[" + last + "] = " + res[last]);
 
         return res;
     }
@@ -275,7 +275,7 @@ public class CostFunction {
         return Imodel + tmp;
     }
 
-    // Not use
+    // Not used
     private float Imodel(int x, int y){
         float Imodel, tmp = 0.0f;
         int l = 1; // precision for finding pixel in the list // x = x + l or x - l, same for y
@@ -313,7 +313,7 @@ public class CostFunction {
         float res = 0.0f;
 
         for(int idx : randomList) {
-            res += -2.0f
+            res += 2.0f
                     * pow(derivImodel(i, idx), 2);
         }
         return res;
@@ -328,7 +328,8 @@ public class CostFunction {
             yA = (float) modelFeatPts.getEntry(j,1);
 
             for(int a =0; a < 60; a++){
-                tmp += alpha_i * (subFSV[i][a][0] + subFSV[i][a][2]);
+                //tmp += alpha_i * (subFSV[i][i][0] + subFSV[i][a][2]);
+                tmp += alpha_i * (subFSV[a][j][0] + subFSV[a][j][2]);
             }
             res += -2.0f
                     * ((xIn + yIn) - (xA + yA) - tmp)
@@ -341,7 +342,7 @@ public class CostFunction {
     private float deriv2Ef(int i, float alpha_i){
         float res = 0.0f;
         for(int j=0; j<k; j++) {
-            res += -2.0f * alpha_i * (subFSV[i][j][0] + subFSV[i][j][2]);
+            res += 2.0f * pow(alpha_i * (subFSV[i][j][0] + subFSV[i][j][2]), 2);
         }
         return res;
     }
@@ -364,10 +365,7 @@ public class CostFunction {
 
     /////////////////////////////////// Apply Sobel Filter /////////////////////////////////////////
     private Mat computeSobelGx(Bitmap srcBmp) {
-        // variables
         Mat src = new Mat();
-        Bitmap dstBmp = Bitmap.createBitmap(srcBmp.getWidth(),
-                srcBmp.getHeight(), Bitmap.Config.ARGB_8888);
 
         // convert Bmp to Mat
         Utils.bitmapToMat(srcBmp, src);
@@ -379,10 +377,7 @@ public class CostFunction {
     }
 
     private Mat computeSobelGy(Bitmap srcBmp) {
-        // variables
         Mat src = new Mat();
-        Bitmap dstBmp = Bitmap.createBitmap(srcBmp.getWidth(),
-                srcBmp.getHeight(), Bitmap.Config.ARGB_8888);
 
         // convert Bmp to Mat
         Utils.bitmapToMat(srcBmp, src);

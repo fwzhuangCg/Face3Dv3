@@ -11,6 +11,8 @@ import org.opencv.imgproc.Imgproc;
 /**
  * Created by Jérôme on 25/07/2015.
  */
+
+// Not used
 public class SobelFilter implements Filter{
 
     private final int scale = 1;

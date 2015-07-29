@@ -19,7 +19,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.List;
-
+import static com.example.jrme.face3dv3.util.MatrixHelper.maxMinXYZ;
 /**
  * Created by JR on 2015/6/22.
  */
@@ -124,8 +124,60 @@ public class IOHelper {
     }
 
     /*
-    * Read the shape binary file (already converted for opengl)
+    * Read the shape binary file (already scaled for opengl)
     */
+    public static float[] readBinShapeArray(String dir, String fileName, int size) {
+        float x;
+        int i = 0;
+        float[] tab = new float[size];
+
+        File sdLien = Environment.getExternalStorageDirectory();
+        File inFile = new File(sdLien + File.separator + dir + File.separator + fileName);
+        Log.d(TAG, "path of file : " + inFile);
+        if (!inFile.exists()) {
+            throw new RuntimeException("File doesn't exist");
+        }
+        DataInputStream in = null;
+        try {
+            in = new DataInputStream(new FileInputStream(inFile));
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+        try {
+            //read first x
+            x = in.readFloat();
+            while (true) {
+                tab[i] = x;
+                i++;
+                x = in.readFloat();
+            }
+        } catch (EOFException e) {
+            try {
+                Log.d(TAG,"close");
+                in.close();
+            } catch (IOException e1) {
+                e1.printStackTrace();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            if (in != null) {
+                try { //free ressources
+                    Log.d(TAG,"close");
+                    in.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        return tab;
+    }
+
+/*    Old version of Shape Binary File Reading (values were not scaled)
+*
+* *//*
+    * Read the shape binary file (already converted for opengl)
+    *//*
     public static float[] readBinShapeArray(String dir, String fileName, int size) {
         float x;
         int i = 0;
@@ -195,7 +247,7 @@ public class IOHelper {
             }
         }
         return tab;
-    }
+    }*/
 
     /*
     * Read the texture binary file
@@ -541,6 +593,8 @@ public class IOHelper {
     /**
      * Read the featureVector_Shape.dat file.
      * Build the double array and return it.
+     * k : number of rows
+     * n : number of columns
      */
     public static float[][] readBinFloatDoubleArray(String dir, String fileName, int k, int n) {
         float[][] array2D = new float[k][n];
@@ -587,9 +641,23 @@ public class IOHelper {
     }
 
     /**
-     * Write float array into binary file of float
+     * Write float array into binary file of float and Rescale for OpenGL
      */
-    public static void writeBinFloat(String dir, String fileName, float[] array) {
+    public static void writeBinFloatScale(String dir, String fileName, float[] array) {
+
+        float[] maxMinXYZ = maxMinXYZ(array);
+        float maxX = maxMinXYZ[0], minX = maxMinXYZ[1], maxY = maxMinXYZ[2], minY = maxMinXYZ[3],
+                maxZ = maxMinXYZ[4], minZ = maxMinXYZ[5];
+
+        float deltaX = (maxX - minX) / 2.0f;
+        float deltaY = (maxY - minY) / 2.0f;
+        float deltaZ = (maxZ - minZ) / 2.0f;
+
+        float midX = (maxX + minX) / 2.0f;
+        float midY = (maxY + minY) / 2.0f;
+        float midZ = (maxZ + minZ) / 2.0f;
+
+        float x, y, z;
 
         File sdLien = Environment.getExternalStorageDirectory();
         File outFile = new File(sdLien + File.separator + dir + File.separator + fileName);
@@ -601,9 +669,23 @@ public class IOHelper {
             e.printStackTrace();
         }
         try {
+
+            for(int i = 0; i< array.length; i = i+ 3){
+
+                x = array[i];
+                out.writeFloat((x - midX) / deltaX); //rescale x
+
+                y = array[i+1];
+                out.writeFloat((y - midY) / deltaY); //rescale y
+
+                z = array[i+2];
+                out.writeFloat((z - midZ) / deltaZ); //rescale z
+            }
+
+              /*
             for (float f : array) {
                     out.writeFloat(f);
-            }
+            }*/
             Log.d(TAG,"close");
             out.close();
         } catch (Exception e) {

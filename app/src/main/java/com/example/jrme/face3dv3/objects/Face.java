@@ -63,7 +63,7 @@ public class Face {
         //////////////////////////// Show the 83 Feature Points ////////////////////////////////////
         int[] landmarks83Index = readBin83PtIndex(CONFIG_DIRECTORY, INDEX83PT_FILE);
         for (int aLandmarks83Index : landmarks83Index) { //
-            int tmp = (aLandmarks83Index + 1) * 3; //bizarre ce +1 mais ca marche la
+            int tmp = (aLandmarks83Index + 1) * 3; // this +1 is strange but it works
             textureArray[tmp] = 0.0f;
             tmp++;
             textureArray[tmp] = 1.0f;

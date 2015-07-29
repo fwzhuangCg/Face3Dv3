@@ -34,8 +34,6 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.example.jrme.face3dv3.filters.convolution.SobelFilterGx;
-import com.example.jrme.face3dv3.filters.convolution.SobelFilterGy;
 import com.example.jrme.face3dv3.fitting.CostFunction;
 import com.example.jrme.face3dv3.util.IOHelper;
 import com.example.jrme.face3dv3.util.MyProcrustes;
@@ -50,8 +48,7 @@ import org.json.JSONObject;
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
-import org.opencv.android.Utils;
-import org.opencv.core.Mat;
+import org.opencv.core.Point;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -66,16 +63,21 @@ import static com.example.jrme.face3dv3.Constants.BYTES_PER_FLOAT;
 import static com.example.jrme.face3dv3.util.IOHelper.fileSize;
 import static com.example.jrme.face3dv3.util.IOHelper.readBin2DShapetoMatrix;
 import static com.example.jrme.face3dv3.util.IOHelper.readBinFloatDoubleArray;
-import static com.example.jrme.face3dv3.util.IOHelper.writeBinFloat;
+import static com.example.jrme.face3dv3.util.IOHelper.writeBinFloatScale;
 import static com.example.jrme.face3dv3.util.ImageHelper.fillHole1;
 import static com.example.jrme.face3dv3.util.ImageHelper.fillHole2;
 import static com.example.jrme.face3dv3.util.ImageHelper.saveBitmaptoPNG;
 import static com.example.jrme.face3dv3.util.MatrixHelper.centroid;
+import static com.example.jrme.face3dv3.util.MatrixHelper.deltaX;
+import static com.example.jrme.face3dv3.util.MatrixHelper.deltaY;
 import static com.example.jrme.face3dv3.util.MatrixHelper.translate;
 
 import static com.example.jrme.face3dv3.util.IOHelper.readBinModel83Pt2DFloat;
 import static com.example.jrme.face3dv3.util.IOHelper.readBinFloat;
 import static com.example.jrme.face3dv3.util.PixelUtil.getMaxMin;
+import static java.lang.Math.abs;
+import static java.lang.Math.cos;
+import static java.lang.Math.sin;
 
 /**
  * Get a picture form your phone<br />
@@ -156,12 +158,12 @@ public class MainActivity extends Activity {
         Log.d(TAG, "onCreate");
         setContentView(R.layout.activity_main);
 
-        //check heap size
+        // CHeck Heap Size
         ActivityManager am = ((ActivityManager)getSystemService(Activity.ACTIVITY_SERVICE));
         int largeMemory = am.getLargeMemoryClass();
         Log.d(TAG,"heap size = "+largeMemory);
 
-        //get model points
+        // Load Model Points
         initialPoints = readBinModel83Pt2DFloat(CONFIG_DIRECTORY,MODEL_2D_83PT_FILE);
 
         buttonDetect = (Button) this.findViewById(R.id.button);
@@ -226,7 +228,7 @@ public class MainActivity extends Activity {
                 buttonSave.setEnabled(false);
                 Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
                 if(takePictureIntent.resolveActivity(getPackageManager()) != null){
-                    // Create the File where the photo should go
+                    // Create the File of the Photo
                     File photoFile = null;
                     try {
                         photoFile = createImageFile();
@@ -251,7 +253,7 @@ public class MainActivity extends Activity {
                 buttonDetect.setEnabled(false);
                 buttonExtract.setEnabled(false);
                 buttonSave.setEnabled(false);
-                //get a picture form your phone
+                // Get a picture from gallery
                 Intent photoPickerIntent = new Intent(Intent.ACTION_PICK);
                 photoPickerIntent.setType("image/*");
                 startActivityForResult(photoPickerIntent, PICTURE_CHOOSE);
@@ -301,7 +303,8 @@ public class MainActivity extends Activity {
                 if (orientation == ExifInterface.ORIENTATION_ROTATE_90) rotationAngle = 90;
                 if (orientation == ExifInterface.ORIENTATION_ROTATE_180) rotationAngle = 180;
                 if (orientation == ExifInterface.ORIENTATION_ROTATE_270) rotationAngle = 270;
-                // rotate image
+
+                // Rotate Image
                 Matrix matrix = new Matrix();
                 matrix.setRotate(rotationAngle, (float) img.getWidth() / 2, (float) img.getHeight() / 2);
                 img = Bitmap.createBitmap(img, 0, 0, options.outWidth, options.outHeight, matrix, true);
@@ -310,7 +313,8 @@ public class MainActivity extends Activity {
                 imageView.setImageBitmap(img);
                 buttonDetect.setEnabled(true);
                 imgBeforeDetect = img;
-                //build the victim matrix when image change
+
+                // Build the Victim Matrix when image change
                 for (int i = 0; i < 83; ++i) {
                     for (int j = 0; j < 2; ++j) {
                         xVicMatrix.setEntry(i, j, initialPoints[i][j]);
@@ -412,7 +416,8 @@ public class MainActivity extends Activity {
                 public void run() {
                     Message msg = null;
 
-                    HttpRequests httpRequests = new HttpRequests("16fcca64b37202c094f53672dc688e38", "ssIfcRfiMqU7jRuw1Yrw3VIlaXMclrj8", true, false);
+                    HttpRequests httpRequests = new HttpRequests("16fcca64b37202c094f53672dc688e38",
+                            "ssIfcRfiMqU7jRuw1Yrw3VIlaXMclrj8", true, false);
 
                     ByteArrayOutputStream stream = new ByteArrayOutputStream();
                     float scale = Math.min(1, Math.min(600f / img.getWidth(), 600f / img.getHeight()));
@@ -463,14 +468,9 @@ public class MainActivity extends Activity {
         void detectResult(JSONObject rst);
     }
 
-    public void showToast(final String toast) {
-        runOnUiThread(new Runnable() {
-            public void run() {
-                Toast.makeText(MainActivity.this, toast, Toast.LENGTH_SHORT).show();
-            }
-        });
-    }
-
+    /*
+     * Process of Face Detection and obtain Features Points
+     */
     private void processDectect() {
         FaceppDetect faceppDetect = new FaceppDetect();
         faceppDetect.setDetectCallback(new DetectCallback() {
@@ -479,7 +479,7 @@ public class MainActivity extends Activity {
 
                 Message msg = null;
 
-                //use the red paint
+                // Use Red Paint
                 Paint paint = new Paint();
                 paint.setColor(Color.RED);
                 paint.setStrokeWidth(Math.max(img.getWidth(), img.getHeight()) / 100f);
@@ -503,15 +503,14 @@ public class MainActivity extends Activity {
                         x = x / 100 * img.getWidth();
                         y = y / 100 * img.getHeight();
                         canvas.drawPoint(x, y, paint);
-                        xBedMatrix.setEntry(i, 0, x);
-                        xBedMatrix.setEntry(i, 1, y);
+                        xBedMatrix.setEntry(i, 0, x); // save Feature Points
+                        xBedMatrix.setEntry(i, 1, y); // save Feature Points
                         i++;
                     }
 
-                    //save new image
+                    //save image
                     img = bitmap;
                     MainActivity.this.runOnUiThread(new Runnable() {
-
                         public void run() {
                             //show the image
                             imageView.setImageBitmap(img);
@@ -527,6 +526,9 @@ public class MainActivity extends Activity {
         faceppDetect.detect(img);
     }
 
+    /*
+     * Process of Face Extraction and Fitting Algorithm
+     */
     private void processExtract() {
 
         new Thread(new Runnable() {
@@ -536,28 +538,28 @@ public class MainActivity extends Activity {
                 Message msg = null;
 
                 try {
-                    //use the green paint
+                    // Use the Green Paint
                     Paint paint = new Paint();
                     paint.setColor(Color.GREEN);
                     paint.setStrokeWidth(Math.max(img.getWidth(), img.getHeight()) / 100f);
 
-                    //create a new canvas
+                    // Create a new canvas
                     Bitmap bitmap = Bitmap.createBitmap(img.getWidth(), img.getHeight(), img.getConfig());
                     Canvas canvas = new Canvas(bitmap);
                     canvas.drawBitmap(img, new Matrix(), null);
 
-                    //draw initial model points
+                    // Draw Initial model points
                     for (int i = 0; i < 83; i++) {
                         canvas.drawPoint((float) xVicMatrix.getEntry(i, 0), (float) xVicMatrix.getEntry(i, 1), paint);
                     }
 
                     MyProcrustes mProc = new MyProcrustes(xBedMatrix, xVicMatrix, rollAngle);
-                    xResult = mProc.getProcrustes(); // 83 points result of the model
+                    xResult = mProc.getProcrustes(); // 83 points Result of the model
                     double distance = mProc.getProcrustesDistance();
                     Log.d(TAG, "procrustes distance = " + distance);
                     RealMatrix R = mProc.getR();
                     Log.d(TAG, "R = " + R);
-                    double S = mProc.getS() * (1.0 - 8.0/100.0);
+                    double S = mProc.getS() ; //* (1.0 - 8.0/100.0); // Reduce the size of 8%
                     Log.d(TAG, "S = " + S);
                     RealMatrix T = mProc.getT();
                     Log.d(TAG, "T = " + T);
@@ -568,26 +570,26 @@ public class MainActivity extends Activity {
                     RealMatrix averageShape2D =
                             readBin2DShapetoMatrix("3DFace/AverageFaceData/BinFiles",
                                     "averageFace2DNotScaled.dat", k);
-                    // adapt the translation matrix to the new dimension (64.140 rows)
-                    double tx = T.getEntry(0, 0), ty = T.getEntry(0, 1) +15;// +18; // higher value the face go down
+                    // Adapt the translation matrix to the new dimension (64.140 rows)
+                    double tx = T.getEntry(0, 0), ty = T.getEntry(0, 1);// +15; // +18; // Higher value the face go down
                     RealMatrix tt = new Array2DRowRealMatrix(k, 2);
                     for (int i = 0; i < k; i++) {
                         tt.setEntry(i, 0, tx);
                         tt.setEntry(i, 1, ty);
                     }
 
-                    // transform it
+                    // Transform it
                     PointF c = centroid(averageShape2D), origin = new PointF(0, 0); // Recenter the points based on the mean
                     RealMatrix X0 = translate(averageShape2D, c, origin);
                     RealMatrix res = X0.multiply(R).scalarMultiply(S).add(tt);
 
-                    // cover in white the face
+                    // Cover in White the Face
                     paint.setColor(Color.WHITE);
                     for (int a = 0; a < res.getRowDimension(); a++) {
                         canvas.drawPoint((float) res.getEntry(a, 0), (float) res.getEntry(a, 1), paint);
                     }
 
-                    //save new image
+                    // Save Image
                     img = bitmap;
                     MainActivity.this.runOnUiThread(new Runnable() {
                         public void run() {
@@ -595,7 +597,7 @@ public class MainActivity extends Activity {
                         }
                     });
 
-                    // get the pixels of face from the previous image
+                    // Get the Pixels of Face from the previous Image
                     facePixels = new ArrayList<>();
                     for (int i = 0; i < k; i++) {
                         try {
@@ -609,12 +611,52 @@ public class MainActivity extends Activity {
                     }
                     Log.d(TAG,"facePixels size = "+facePixels.size());
 
-                    //draw on white face
+                    // Draw on White Face
                     for (Pixel p : facePixels) {
                         bitmap.setPixel(p.getX(),p.getY(),p.getRGB());
                     }
+/*
 
-                    //save new image
+                    // Draw Result 83 Points
+                    paint.setColor(Color.MAGENTA);
+                    for (int i = 0; i < 83; i++) {
+                        canvas.drawPoint((float) xResult.getEntry(i, 0), (float) xResult.getEntry(i, 1), paint);
+                    }
+
+                    // Rotate the 83 Results Points (because upside down) //////////////////////////
+                    PointF cBedFt = centroid(xResult);
+                    RealMatrix xResult2 = xResult.copy();
+                    for (int i = 0; i < 83; i++) {
+                        xResult2.setEntry(i, 0, img.getWidth() - xResult.getEntry(i, 0));
+                        xResult2.setEntry(i, 1, img.getHeight() - xResult.getEntry(i, 1));
+                    }
+                    PointF cResultFt = centroid(xResult2);
+                    RealMatrix xResultRotated = translate(xResult2, cResultFt, cBedFt);
+                    paint.setColor(Color.YELLOW);
+                    // print it on face
+                    for (int i = 0; i < 83; i++) {
+                        canvas.drawPoint( (float) xResultRotated.getEntry(i, 0), (float) xResultRotated.getEntry(i, 1), paint);
+                    }
+                    ////////////////////////////////////////////////////////////////////////////////
+
+                    paint.setColor(Color.BLUE);
+                    canvas.drawPoint((float) xResultRotated.getEntry(27, 0),
+                            (float) xResultRotated.getEntry(27, 1), paint);
+                    canvas.drawPoint((float) xResultRotated.getEntry(66, 0),
+                            (float) xResultRotated.getEntry(66, 1), paint);
+
+                    paint.setColor(Color.BLACK);
+                    canvas.drawPoint((float) xBedMatrix.getEntry(27, 0),
+                            (float) xBedMatrix.getEntry(27, 1), paint);
+                    paint.setColor(Color.RED);
+                    canvas.drawPoint((float) xBedMatrix.getEntry(66, 0),
+                            (float) xBedMatrix.getEntry(66, 1), paint);
+
+                    float delta = (float) abs(xBedMatrix.getEntry(66, 1) - xResultRotated.getEntry(66, 1));
+                    Log.d(TAG,"distance = "+ delta);
+*/
+
+                    // Save Image
                     img = bitmap;
                     MainActivity.this.runOnUiThread(new Runnable() {
                         public void run() {
@@ -627,8 +669,9 @@ public class MainActivity extends Activity {
                     //writePixels("3DFace/AverageFaceData", "facePixels.txt", facePixels);
                     //writePixels("3DFace/AverageFaceData","modelPixels.txt",modelPixels);
 
+                    // Load the BIG File
                     float [][] s = readBinFloatDoubleArray(SHAPE_DIRECTORY,
-                            FEATURE_S_FILE, 192420, 60); //BIG
+                            FEATURE_S_FILE, 192420, 60);
 
                     ////////////////////////////////////////////////////////////////////////////////
                     // Compute Cost Function 10 times  ///// Core of the program ///////////////////
@@ -640,36 +683,34 @@ public class MainActivity extends Activity {
                     modelPixels = new ArrayList<>();
 
                     // Iteration
-                    for(int it = 0; it < 10; it++){
+                    for(int it = 0; it < 1; it++){
 
-                        // First iteration we load the Average Face ////////////////////////////////
+                        // First Iteration we load the Average Face ////////////////////////////////
                         if(it == 0){
-
                             modelTexture = readBinFloat(TEXTURE_DIRECTORY, AVERAGE_TEXTURE_FILE, NUM_CASES);
                             modelShape = readBinFloat(SHAPE_DIRECTORY, AVERAGE_SHAPE_FILE, NUM_CASES);
                             Log.d(TAG,"NUM CASES = "+ NUM_CASES);
                             Log.d(TAG,"averageTexture size = "+ modelTexture.length);
                             Log.d(TAG,"averageShape size = "+ modelShape.length);
                             for(int i=0, idx=0; i<NUM_CASES; i=i+3,idx++){
-                                //get r g b and x y
+                                //get R G B and X Y
                                 int rgb = Color.rgb((int) modelTexture[i], (int) modelTexture[i + 1], (int) modelTexture[i + 2]);
-                                Pixel p = new Pixel(modelShape[i], modelShape[i + 2], rgb); // 2nd constructor with xF and yF
+                                Pixel p = new Pixel(modelShape[i], modelShape[i + 2], rgb); // 2nd Constructor with xF and yF
                                 modelPixels.add(idx, p);
                             }
                             Log.d(TAG,"averagePixels size = "+ modelPixels.size());
                             Log.d(TAG,"Average Face load successfully");
                         }
-                        // Next iteration we use the previous calculated Model Shape ///////////////
+                        // Next Iteration we use the previously calculated Model Shape /////////////
                         else{
-
                             modelShape = modelShapeFinal;
                             Log.d(TAG,"NUM CASES = "+ NUM_CASES);
                             Log.d(TAG,"modelShape size = "+ modelShape.length);
                             for(int i=0, idx=0; i<NUM_CASES; i=i+3,idx++){
-                                //get r g b and x y
-                                int rgb = facePixels.get(idx).getRGB(); // this time we use the input face texture
-                                Pixel p = new Pixel(modelShape[i], modelShape[i + 2], rgb); // 2nd constructor with xF and yF
-                                modelPixels.set(idx, p); // set this time
+                                //get R G B and X Y
+                                int rgb = facePixels.get(idx).getRGB(); // this time we use the Input Face Texture
+                                Pixel p = new Pixel(modelShape[i], modelShape[i + 2], rgb); // 2nd Constructor with xF and yF
+                                modelPixels.set(idx, p); // replace by the new value
                             }
                             Log.d(TAG,"modelPixels size = "+ modelPixels.size());
                             Log.d(TAG,"Model Face load successfully");
@@ -691,8 +732,7 @@ public class MainActivity extends Activity {
                             float b = p.getYF();
                             int x = (int) ((250-1) * ( p.getXF() - maxMin[1])/ (maxMin[0] - maxMin[1]));
                             int y = (int) ((250-1) * ( p.getYF() - maxMin[3]) / (maxMin[2] - maxMin[3]));
-
-                            // set the pixel location (int) of model image
+                            // Set the Pixel Location (int) of Model Image to ModelPixels
                             p.setX(x);
                             p.setY(y);
                             try{
@@ -709,11 +749,12 @@ public class MainActivity extends Activity {
                         // fill the pixels hole
                         fillHole1(bmpModel);
                         fillHole2(bmpModel);
-                        fillHole2(bmpModel);
+                        fillHole2(bmpModel); // again
 
                         saveBitmaptoPNG(TEXTURE_DIRECTORY, "modelFace2D.png", bmpModel); //save
                         ////////////////////////////////////////////////////////////////////////////
-/*
+
+/*                      Sobel is applied inside the Cost Function
                         // Apply sobel
                         Bitmap sobelGx = BmpSobelGx(bmpModel);
                         Bitmap sobelGy = BmpSobelGy(bmpModel);
@@ -721,9 +762,10 @@ public class MainActivity extends Activity {
                         saveBitmaptoPNG(TEXTURE_DIRECTORY, "modelFace2DGx.png", sobelGx); //save
                         saveBitmaptoPNG(TEXTURE_DIRECTORY, "modelFace2DGy.png", sobelGy); //save
 */
+
                         // Build Cost Function /////////////////////////////////////////////////////
                         CostFunction costFunc =  new CostFunction(facePixels, modelPixels,
-                                xBedMatrix,xResult, s, bmpModel);
+                                xBedMatrix, xResult, s, bmpModel);
                         float[] alpha = costFunc.getAlpha();
                         Log.d(TAG," Ei = "+ costFunc.getEi());
                         Log.d(TAG," Ef = "+ costFunc.getEf());
@@ -732,23 +774,22 @@ public class MainActivity extends Activity {
 
                         // Build the 3DMM using Alpha values ///////////////////////////////////////
                         float res1 = 0.0f, res2 = 0.0f, res3 = 0.0f;
-                        for(int i=0; i<NUM_CASES; i=i+3){
+                        for(int idx=0; idx<NUM_CASES; idx = idx + 3){
 
-                            for(int a=0; a <60; a++){
-                                res1 += alpha[a] * s[i][a];
-                                res2 += alpha[a] * s[i + 1][a];
-                                res3 += alpha[a] * s[i +2][a];
+                            for(int i=0; i <60; i++){
+                                res1 += alpha[i] * s[idx][i];
+                                res2 += alpha[i] * s[idx + 1][i];
+                                res3 += alpha[i] * s[idx +2][i];
                             }
-                            modelShapeFinal[i] = modelShape[i] + res1;
-                            modelShapeFinal[i+1] = modelShape[i+1] + res2;
-                            modelShapeFinal[i+2] = modelShape[i+2] + res3;
+                            modelShapeFinal[idx] = modelShape[idx] + res1;
+                            modelShapeFinal[idx + 1] = modelShape[idx + 1] + res2;
+                            modelShapeFinal[idx + 2] = modelShape[idx + 2] + res3;
                         }
                         ////////////////////////////////////////////////////////////////////////////
 
                         // Free resources
                         bmpModel.recycle();
                     }
-
                     ////////////////////////////////////////////////////////////////////////////////
                     ////////////////////////////////////////////////////////////////////////////////
                     ////////////////////////////////////////////////////////////////////////////////
@@ -764,10 +805,12 @@ public class MainActivity extends Activity {
                     }
                 }
             }
-
         }).start();
     }
 
+    /*
+     * Save the Final Shape and Texture in Files
+     */
     private void processSave() {
 
         new Thread(new Runnable() {
@@ -778,7 +821,7 @@ public class MainActivity extends Activity {
 
                 try {
                     IOHelper.convertPixelsToBin(facePixels, "3DFace/DMM/Texture/faceTexture.dat");
-                    writeBinFloat(SHAPE_DIRECTORY, MODEL_SHAPE_FILE, modelShapeFinal);
+                    writeBinFloatScale(SHAPE_DIRECTORY, MODEL_SHAPE_FILE, modelShapeFinal);
                     msg = mHandler.obtainMessage(SAVE_OK);
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -882,7 +925,7 @@ public class MainActivity extends Activity {
         );
     }
 
-    // add the taken image in the gallery application
+    // Add the taken image in the Gallery
     private void galleryAddPic() {
         Intent mediaScanIntent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
         Log.d(TAG,"image path"+mCurrentPhotoPath);
@@ -950,6 +993,7 @@ public class MainActivity extends Activity {
     }
 
     /*
+    Sobel is applied inside the Cost Function
     /////////////////////////////////// Apply Sobel Filter /////////////////////////////////////////
     private Bitmap BmpSobelGx(Bitmap srcBmp) {
         // variables
