@@ -8,6 +8,8 @@ import android.util.Log;
 import com.example.jrme.face3dv3.filters.convolution.SobelFilterGx;
 import com.example.jrme.face3dv3.filters.convolution.SobelFilterGy;
 import com.example.jrme.face3dv3.util.Pixel;
+
+import org.apache.commons.math3.linear.Array2DRowRealMatrix;
 import org.apache.commons.math3.linear.RealMatrix;
 import org.apache.commons.math3.stat.descriptive.moment.Mean;
 import org.opencv.android.Utils;
@@ -154,9 +156,32 @@ public class CostFunction {
     /////////////////////////////////// Equation 18 ////////////////////////////////////////////////
     private float computeEf(){
         float res = 0.0f;
+        RealMatrix xP = P();
         for(int j=0; j<k; j++) {
+            res += pow(inputFeatPts.getEntry(j,0) - xP.getEntry(j,0), 2)
+                    + pow(inputFeatPts.getEntry(j,1) - xP.getEntry(j,1), 2);
+        }
+
+       /* for(int j=0; j<k; j++) {
             res += pow(inputFeatPts.getEntry(j,0) - modelFeatPts.getEntry(j,0), 2)
                     + pow(inputFeatPts.getEntry(j,1) - modelFeatPts.getEntry(j,1), 2);
+        }*/
+        return res;
+    }
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /////////////////////////////////// Calculate P Matrix of Equation 18 //////////////////////////
+    private RealMatrix P(){
+        RealMatrix res = new Array2DRowRealMatrix(83, 2);
+
+        for(int j = 0; j< k ; j++){
+            double X = modelFeatPts.getEntry(j, 0), Y = modelFeatPts.getEntry(j,1);
+            for(int i =0; i<60; i++){
+                X += alpha[i] * subFSV[i][j][0];
+                Y += alpha[i] * subFSV[i][j][2];
+            }
+            res.setEntry(j, 0, X);
+            res.setEntry(j, 1, Y);
         }
         return res;
     }

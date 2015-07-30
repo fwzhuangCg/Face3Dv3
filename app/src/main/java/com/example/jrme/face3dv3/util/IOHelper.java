@@ -173,12 +173,11 @@ public class IOHelper {
         return tab;
     }
 
-/*    Old version of Shape Binary File Reading (values were not scaled)
-*
-* *//*
-    * Read the shape binary file (already converted for opengl)
-    *//*
-    public static float[] readBinShapeArray(String dir, String fileName, int size) {
+
+    /* Old version of Shape Binary File Reading (values were not scaled)
+    * Read the shape binary file
+    */
+    public static float[] readBinAverageShapeArray(String dir, String fileName, int size) {
         float x;
         int i = 0;
         float[] tab = new float[size];
@@ -247,7 +246,7 @@ public class IOHelper {
             }
         }
         return tab;
-    }*/
+    }
 
     /*
     * Read the texture binary file

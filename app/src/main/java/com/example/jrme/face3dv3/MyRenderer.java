@@ -15,9 +15,12 @@ import static android.opengl.GLES20.GL_COLOR_BUFFER_BIT;
 import static android.opengl.GLES20.GL_DEPTH_BUFFER_BIT;
 import static android.opengl.GLES20.GL_DEPTH_TEST;
 import static android.opengl.GLES20.GL_LEQUAL;
+import static android.opengl.GLES20.GL_CULL_FACE;
+import static android.opengl.GLES20.GL_BACK;
 import static android.opengl.GLES20.glClear;
 import static android.opengl.GLES20.glClearColor;
 import static android.opengl.GLES20.glClearDepthf;
+import static android.opengl.GLES20.glCullFace;
 import static android.opengl.GLES20.glDepthFunc;
 import static android.opengl.GLES20.glDepthMask;
 import static android.opengl.GLES20.glEnable;
@@ -98,16 +101,16 @@ public class MyRenderer implements GLSurfaceView.Renderer {
         // Counter-clockwise winding.
         //glFrontFace(GL_CCW);
 
-        // Use culling to remove back faces.
-        //glEnable(GL_CULL_FACE);
-
         glClearDepthf(1.0f);
         glDepthFunc(GL_LEQUAL);
         glDepthMask(true);
 
-        // cull backface
-        //glEnable(GL_CULL_FACE);
-        //glCullFace(GL_BACK);
+        // Use culling to remove back faces.
+        //glEnable(GL_CULL_FACE); // if enable by default Back Face are culled
+
+        // Cull backface
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK); // call it just to be sure
 
         //Enable depth testing on z-buffer:
         glEnable(GL_DEPTH_TEST);

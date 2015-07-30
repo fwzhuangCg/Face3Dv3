@@ -13,6 +13,7 @@ import static android.opengl.GLES20.glDrawElements;
 import static com.example.jrme.face3dv3.Constants.BYTES_PER_FLOAT;
 import static com.example.jrme.face3dv3.Constants.BYTES_PER_INT;
 import static com.example.jrme.face3dv3.util.IOHelper.fileSize;
+import static com.example.jrme.face3dv3.util.IOHelper.readBinAverageShapeArray;
 import static com.example.jrme.face3dv3.util.IOHelper.readBinIndexArray;
 import static com.example.jrme.face3dv3.util.IOHelper.readBinShapeArray;
 import static com.example.jrme.face3dv3.util.IOHelper.readBinTextureArray;
@@ -57,6 +58,7 @@ public class Face {
         Log.d(TAG, "NUM_TRIANGLES = "+NUM_TRIANGLES);
 
         float[] shapeArray = readBinShapeArray(SHAPE_DIRECTORY, MODEL_SHAPE_FILE, NUM_CASES);
+//        float[] shapeArray = readBinAverageShapeArray(SHAPE_DIRECTORY, AVERAGE_SHAPE_FILE, NUM_CASES);
         float[] textureArray = readBinTextureArray(TEXTURE_DIRECTORY, MODEL_TEXTURE_FILE, NUM_CASES);
         int[] IndexArray = readBinIndexArray(CONFIG_DIRECTORY, MESH_FILE, NUM_INDEX);
 
