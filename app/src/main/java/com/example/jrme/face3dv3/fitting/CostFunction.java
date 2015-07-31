@@ -1,8 +1,6 @@
 package com.example.jrme.face3dv3.fitting;
 
 import android.graphics.Bitmap;
-import android.graphics.Color;
-import android.nfc.Tag;
 import android.util.Log;
 
 import com.example.jrme.face3dv3.filters.convolution.SobelFilterGx;
@@ -11,20 +9,15 @@ import com.example.jrme.face3dv3.util.Pixel;
 
 import org.apache.commons.math3.linear.Array2DRowRealMatrix;
 import org.apache.commons.math3.linear.RealMatrix;
-import org.apache.commons.math3.stat.descriptive.moment.Mean;
 import org.opencv.android.Utils;
 import org.opencv.core.Mat;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 
-import static com.example.jrme.face3dv3.util.IOHelper.readBin83PtIndex;
 import static com.example.jrme.face3dv3.util.IOHelper.readBinFloat;
 import static com.example.jrme.face3dv3.util.IOHelper.readBinSFSV;
-import static com.example.jrme.face3dv3.util.ImageHelper.saveBitmaptoPNG;
 import static com.example.jrme.face3dv3.util.PixelUtil.getPixel;
 import static java.lang.Math.abs;
 import static java.lang.Math.pow;
@@ -46,13 +39,11 @@ public class CostFunction {
     private static final String SFSV_FILE = "subFeatureShapeVector.dat";
 
     private float E;
-    private float Ei;
-    private float Ef;
-    private float sigmaI = 1;
-    private float sigmaF = 10;
+    private float sigmaI;
+    private float sigmaF;
 
     private float[] alpha = new float[60];
-    private float[] beta = new float[60];
+    //private float[] beta = new float[60];
     private float[] eigValS;
     private float[] eigValT;
     private float[][] s; // eigenVector // BIG
@@ -62,7 +53,7 @@ public class CostFunction {
     private List<Pixel> input;
     private RealMatrix inputFeatPts;
     private RealMatrix modelFeatPts;
-    private int[] featPtsIndex;
+    //private int[] featPtsIndex;
     private int k;
     private Mat dxModel;
     private Mat dyModel;
@@ -72,10 +63,10 @@ public class CostFunction {
     private List<Integer> randomList = new ArrayList<>();
 
     /////////////////////////////////// Constructor ////////////////////////////////////////////////
-    public CostFunction(List<Pixel> input, List<Pixel> model,
-                        RealMatrix inputFeatPts, RealMatrix modelFeatPts, float [][] eigenVectors, Bitmap bmpModel) {
+    public CostFunction(List<Pixel> input, List<Pixel> model, RealMatrix inputFeatPts,
+                        RealMatrix modelFeatPts, float [][] eigenVectors, Bitmap bmpModel) {
 
-        this.featPtsIndex = readBin83PtIndex(CONFIG_DIRECTORY, INDEX83PT_FILE);
+        //this.featPtsIndex = readBin83PtIndex(CONFIG_DIRECTORY, INDEX83PT_FILE);
         this.input = input;
         this.model = model;
         this.inputFeatPts = inputFeatPts;
@@ -85,7 +76,7 @@ public class CostFunction {
         this.eigValT = readBinFloat(TEXTURE_DIRECTORY, EIG_TEXTURE_FILE, 60);
         this.subFSV = readBinSFSV(CONFIG_DIRECTORY, SFSV_FILE);
 
-        // checking arguments
+        // Checking arguments
         if(input.isEmpty() || model.isEmpty()){
             throw new IllegalArgumentException("input or model list are empty");
         }
@@ -96,49 +87,82 @@ public class CostFunction {
             throw new IllegalArgumentException("inputFeatPts and modelFeatPts do not have the same size");
         }
 
-        // initialy populate list, the value doesn't matter
+        // Initialy populate list, the value doesn't matter
         for (int h = 0; h < 500;h++) {
             this.randomList.add(0);
         }
 
         this.s = eigenVectors;
 
+        // Initial Value
+        alpha[0]= 1.0f / 60.0f;
+        sigmaI = 1f;
+        sigmaF = 10f;
+
         this.dxModel = computeSobelGx(bmpModel);
         this.dyModel = computeSobelGy(bmpModel);
         //saveBitmaptoPNG(TEXTURE_DIRECTORY, "modelFace2DGx.png", bmpModelGx); //save
         //saveBitmaptoPNG(TEXTURE_DIRECTORY, "modelFace2DGy.png", bmpModelGy); //save
 
-        this.alpha = computeAlpha();
-
-        this.Ei = computeEi();
-        this.Ef = computeEf();
         this.E = computeE();
     }
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
     /////////////////////////////////// Getter /////////////////////////////////////////////////////
-    public float getE() {
-        return E;
-    }
-
-    public float getEf() {
-        return Ef;
-    }
-
-    public float getEi() {
-        return Ei;
-    }
-
     public float[] getAlpha() {
         return alpha;
     }
+    ////////////////////////////////////////////////////////////////////////////////////////////////
 
-    public float[] getBeta() {
-        return beta;
+    /////////////////////////////////// Equation 21 ////////////////////////////////////////////////
+    private float computeE(){
+        float E = 0.0f, Ei, Ef;
+        for(int it = 0; it < 10; it++){
+
+            Log.d(TAG," alpha it = "+ it + " value = "+ alpha[it]);
+
+            // Pick 500 Random Vertices Index each iteration
+            Random r = new Random();
+            for(int h =0; h< 500; h++){
+                this.randomList.set(h, r.nextInt(end - start + 1) + start);
+            }
+
+            Ei = computeEi();
+            Ef = computeEf();
+            E = (float) ((1/pow(sigmaI,2)) * Ei +
+                    (1/pow(sigmaF,2)) * Ef +
+                    sum_Alpha_eigValS() +
+                    sum_Beta_eigValT());
+            Log.d(TAG," sigmaI = "+ it + " sigmaI = "+ sigmaI);
+            Log.d(TAG," sigmaF = "+ it + " sigmaF = "+ sigmaF);
+            Log.d(TAG," it = "+ it + " sum_Alpha_eigValS() = "+ sum_Alpha_eigValS());
+            Log.d(TAG," it = "+ it + " sum_Beta_eigValT() = "+ sum_Beta_eigValT());
+            Log.d(TAG," it = "+ it + " Ei = "+ Ei);
+            Log.d(TAG," it = "+ it + " Ef = "+ Ef);
+            Log.d(TAG," it = "+ it + " E = "+ E);
+            Log.d(TAG,"*");
+
+            computeNextAlpha(it); // Compute the alpha[it + 1] value
+            sigmaI++;
+            sigmaF--;
+        }
+        return E;
     }
 
-    public int getK() {
-        return k;
+    private float sum_Alpha_eigValS(){
+        float res = 0.0f;
+        for(int i=0;i<60;i++){
+            res += pow(alpha[i], 2)/pow(eigValS[i], 2);
+        }
+        return res;
+    }
+
+    private float sum_Beta_eigValT(){
+        float res = 0.0f;
+        for(int i=0;i<60;i++){
+            res += pow(alpha[i], 2)/pow(eigValT[i], 2);
+        }
+        return res;
     }
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -156,22 +180,17 @@ public class CostFunction {
     /////////////////////////////////// Equation 18 ////////////////////////////////////////////////
     private float computeEf(){
         float res = 0.0f;
-        RealMatrix xP = P();
-        for(int j=0; j<k; j++) {
-            res += pow(inputFeatPts.getEntry(j,0) - xP.getEntry(j,0), 2)
-                    + pow(inputFeatPts.getEntry(j,1) - xP.getEntry(j,1), 2);
+        RealMatrix modelP = Pmodel();
+        for(int j = 0; j < k; j++) {
+            res += pow(inputFeatPts.getEntry(j,0) - modelP.getEntry(j,0), 2)
+                    + pow(inputFeatPts.getEntry(j,1) - modelP.getEntry(j,1), 2);
         }
-
-       /* for(int j=0; j<k; j++) {
-            res += pow(inputFeatPts.getEntry(j,0) - modelFeatPts.getEntry(j,0), 2)
-                    + pow(inputFeatPts.getEntry(j,1) - modelFeatPts.getEntry(j,1), 2);
-        }*/
         return res;
     }
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
     /////////////////////////////////// Calculate P Matrix of Equation 18 //////////////////////////
-    private RealMatrix P(){
+    private RealMatrix Pmodel(){
         RealMatrix res = new Array2DRowRealMatrix(83, 2);
 
         for(int j = 0; j< k ; j++){
@@ -187,84 +206,36 @@ public class CostFunction {
     }
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
-    /////////////////////////////////// Equation 21 ////////////////////////////////////////////////
-    private float computeE(){
-        float res;
-        res = (float) ((1/pow(sigmaI,2))*Ei +
-                (1/pow(sigmaF,2))*Ef +
-                sum_Alpha_eigValS() +
-                sum_Beta_eigValT());
-        return res;
-    }
-
-    private float sum_Alpha_eigValS(){
-        float res = 0.0f;
-        for(int i=0;i<60;i++){
-            res += pow(alpha[i],2)/pow(eigValS[i],2);
-        }
-        return res;
-    }
-
-    private float sum_Beta_eigValT(){
-        float res = 0.0f;
-        for(int i=0;i<60;i++){
-            res += pow(alpha[i],2)/pow(eigValT[i],2);
-        }
-        return res;
-    }
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-
     /////////////////////////////////// Equation 31 ////////////////////////////////////////////////
-    private float[] computeAlpha(){
+    private void computeNextAlpha(int it){
 
-        float[] res = new float[60]; // alpha
-        float[] alphaStar = new float[60];
+        float alphaStar;
         float num, denum, lambda = 0.0001f; // initial 0.0001f;
-        res[0]= 1.0f / 60.0f; //initial value
 
-        for(int i=0; i<60-1; i++){
+        num = (float) ((1/pow(sigmaI,2)) * deriv2Ei(it) * alpha[it]
+                    + (1/pow(sigmaF,2)) * deriv2Ef(it) * alpha[it]
+                    - (1/pow(sigmaI,2)) * derivEi(it) * alpha[it]
+                    - (1/pow(sigmaF,2)) * derivEf(it) * alpha[it]
+                    + (2/pow(eigValS[it],2)) * mean(alpha,it + 1));
+        denum = (float) ((1/pow(sigmaI,2)) * deriv2Ei(it) * alpha[it]
+                    + (1/pow(sigmaF,2)) * derivEf(it) * alpha[it]
+                    + (2/pow(eigValS[it],2)));
+        alphaStar = num/denum;
 
-            Log.d(TAG,"compute alpha, i = "+ i);
-            Log.d(TAG,"alpha[" + i + "] = " + res[i]);
-
-            // collect 500 random vertices each iteration
-            Random r = new Random();
-            for(int h =0; h< 500; h++){
-                this.randomList.set(h, r.nextInt(end - start + 1) + start);
-            }
-
-            num = (float) ((1/pow(sigmaI,2)) * deriv2Ei(i) * res[i]
-                    + (1/pow(sigmaF,2)) * deriv2Ef(i, res[i]) * res[i]
-                    - (1/pow(sigmaI,2)) * derivEi(i) * res[i]
-                    - (1/pow(sigmaF,2)) * derivEf(i, res[i]) * res[i]
-                    + (2/pow(eigValS[i],2)) * mean(res,i + 1));
-            denum = (float) ((1/pow(sigmaI,2))* deriv2Ei(i) * res[i]
-                    + (1/pow(sigmaF,2))* derivEf(i, res[i]) * res[i]
-                    + (2/pow(eigValS[i],2)));
-            alphaStar[i] = num/denum;
-
-            /*
-            Log.d(TAG,"deriv2Ei["+i+"] = " + deriv2Ei(i));
-            Log.d(TAG,"deriv2Ef["+i+"] = " + deriv2Ef(i,res[i]));
-            Log.d(TAG,"derivEi["+i+"] = " + derivEi(i));
-            Log.d(TAG,"derivEf["+i+"] = " + derivEf(i, res[i]));
-            Log.d(TAG, "eigValS[" + i + "] = " + eigValS[i]);
-            Log.d(TAG, "square eigValS[" + i + "] = " + pow(eigValS[i], 2));
-            Log.d(TAG, "2 / eigValS[" + i + "] = " + 2/pow(eigValS[i],2));
+        Log.d(TAG,"*******");
+            Log.d(TAG,"deriv2Ei["+it+"] = " + deriv2Ei(it));
+            Log.d(TAG,"deriv2Ef["+it+"] = " + deriv2Ef(it));
+            Log.d(TAG,"derivEi["+it+"] = " + derivEi(it));
+            Log.d(TAG,"derivEf["+it+"] = " + derivEf(it));
+            Log.d(TAG, "eigValS[" + it + "] = " + eigValS[it]);
+            Log.d(TAG, "square eigValS[" + it + "] = " + pow(eigValS[it], 2));
+            Log.d(TAG, "2 / eigValS[" + it + "] = " + 2/pow(eigValS[it],2));
             Log.d(TAG,"num = "+ num);
             Log.d(TAG,"denum = "+ denum);
-            Log.d(TAG,"alpha star = "+ alphaStar[i]);
-            Log.d(TAG,"*");
-            */
+            Log.d(TAG,"alpha star = "+ alphaStar);
+        Log.d(TAG,"*****");
 
-            res[i+1] = res[i] + lambda * (alphaStar[i] - res[i]); // iteration
-        }
-
-        int last = res.length - 1;
-        Log.d(TAG,"compute alpha, i = "+ last);
-        Log.d(TAG,"alpha[" + last + "] = " + res[last]);
-
-        return res;
+        alpha[it + 1] = alpha[it] + lambda * (alphaStar - alpha[it]); // iteration
     }
 
     /*
@@ -299,27 +270,6 @@ public class CostFunction {
         }
         return Imodel + tmp;
     }
-
-    // Not used
-    private float Imodel(int x, int y){
-        float Imodel, tmp = 0.0f;
-        int l = 1; // precision for finding pixel in the list // x = x + l or x - l, same for y
-        Pixel pix = getPixel(model, x, y, l);
-        if(pix == null){
-            throw new IllegalArgumentException("getPixel didn't succeed for x = "+ x +" and y = "+ y);
-        }
-        Imodel = 0.299f * pix.getR()
-                + 0.5876f * pix.getG()
-                + 0.114f * pix.getB();
-        int idx = model.lastIndexOf(pix);
-        if (idx == -1){
-            throw new IllegalArgumentException("No index for x =" + x + " and y = "+y);
-        }
-        for(int i =0; i<60; i++){
-            tmp += alpha[i] * (s[idx * 3][i] + s[idx * 3 + 2][i]);
-        }
-        return Imodel + tmp;
-    }
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
     /////////////////////////////////// Derivation Function ////////////////////////////////////////
@@ -344,7 +294,7 @@ public class CostFunction {
         return res;
     }
 
-    private float derivEf(int i, float alpha_i){
+    private float derivEf(int i){
         float res=0.0f, xIn, yIn, xA, yA, tmp = 0.0f;
         for(int j=0; j<k; j++) {
             xIn = (float) inputFeatPts.getEntry(j,0);
@@ -353,21 +303,20 @@ public class CostFunction {
             yA = (float) modelFeatPts.getEntry(j,1);
 
             for(int a =0; a < 60; a++){
-                //tmp += alpha_i * (subFSV[i][i][0] + subFSV[i][a][2]);
-                tmp += alpha_i * (subFSV[a][j][0] + subFSV[a][j][2]);
+                tmp += alpha[a] * (subFSV[a][j][0] + subFSV[a][j][2]);
             }
             res += -2.0f
                     * ((xIn + yIn) - (xA + yA) - tmp)
-                    * alpha_i
+                    * alpha[i]
                     * (subFSV[i][j][0] + subFSV[i][j][2]);
         }
         return res;
     }
 
-    private float deriv2Ef(int i, float alpha_i){
+    private float deriv2Ef(int i){
         float res = 0.0f;
         for(int j=0; j<k; j++) {
-            res += 2.0f * pow(alpha_i * (subFSV[i][j][0] + subFSV[i][j][2]), 2);
+            res += 2.0f * pow(alpha[i] * (subFSV[i][j][0] + subFSV[i][j][2]), 2);
         }
         return res;
     }

@@ -700,6 +700,100 @@ public class MainActivity extends Activity {
                             FEATURE_S_FILE, 192420, 60);
 
                     ////////////////////////////////////////////////////////////////////////////////
+                    // Compute Cost Function   ///// Core of the program ///////////////////////////
+                    ////////////////////////////////////////////////////////////////////////////////
+
+                    // Initialisation
+                    float[] modelTexture, modelShape;
+                    modelShapeFinal = new float[NUM_CASES];
+                    modelPixels = new ArrayList<>();
+
+                    modelTexture = readBinFloat(TEXTURE_DIRECTORY, AVERAGE_TEXTURE_FILE, NUM_CASES);
+                    modelShape = readBinFloat(SHAPE_DIRECTORY, AVERAGE_SHAPE_FILE, NUM_CASES);
+
+                    // Model Pixels
+                    for(int i=0, idx=0; i<NUM_CASES; i=i+3,idx++){
+                        //get R G B and X Y
+                        int rgb = Color.rgb((int) modelTexture[i], (int) modelTexture[i + 1], (int) modelTexture[i + 2]);
+                        Pixel p = new Pixel(modelShape[i], modelShape[i + 2], rgb); // 2nd Constructor with xF and yF
+                        modelPixels.add(idx, p);
+                    }
+
+                    // Model 83 Feature Points
+                    for (int i = 0; i<landmarks83Index.length; i++) {
+                        int tmp = landmarks83Index[i] + 1; // This +1 is strange but it works
+                        xModel83FtPt.setEntry(i, 0, averageShape2DRes.getEntry(tmp,0));
+                        xModel83FtPt.setEntry(i, 1, averageShape2DRes.getEntry(tmp,1));
+                    }
+
+                    Log.d(TAG,"averagePixels size = "+ modelPixels.size());
+                    Log.d(TAG,"Average Face load successfully");
+
+                    // Create an image of the Model Face ///////////////////////////////////////
+                    int w = 250, h = 250;
+                    Bitmap bmpModel = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888); // this creates a MUTABLE bitmap
+                    float[] maxMin = getMaxMin(modelPixels);
+                    Log.d(TAG," max X = "+ maxMin[0]);
+                    Log.d(TAG," min X = "+ maxMin[1]);
+                    Log.d(TAG," max Y = "+ maxMin[2]);
+                    Log.d(TAG, " min Y = " + maxMin[3]);
+
+                    for (Pixel p : modelPixels) {
+                        float a = p.getXF();
+                        float b = p.getYF();
+                        int x = (int) ((250-1) * ( p.getXF() - maxMin[1])/ (maxMin[0] - maxMin[1]));
+                        int y = (int) ((250-1) * ( p.getYF() - maxMin[3]) / (maxMin[2] - maxMin[3]));
+                        // Set the Pixel Location (int) of Model Image to ModelPixels
+                        p.setX(x);
+                        p.setY(y);
+                        try{
+                            bmpModel.setPixel( x, y, p.getRGB());
+                        } catch(Exception e){
+                            // if failed => print what was wrong
+                            Log.e(TAG, "a = " + a);
+                            Log.e(TAG, "b = " + b);
+                            Log.e(TAG, "x = " + x);
+                            Log.e(TAG, "y = " + y);
+                            throw new IllegalArgumentException("Out of border");
+                        }
+                    }
+
+                    // fill the pixels hole
+                    fillHole1(bmpModel);
+                    fillHole2(bmpModel);
+                    fillHole2(bmpModel); // again
+
+                    saveBitmaptoPNG(TEXTURE_DIRECTORY, "modelFace2D.png", bmpModel); //save
+                    ////////////////////////////////////////////////////////////////////////////
+
+                    // Build Cost Function /////////////////////////////////////////////////////
+                    CostFunction costFunc =  new CostFunction(facePixels, modelPixels,
+                            xBedMatrix, xModel83FtPt, s, bmpModel);
+                    float[] alpha = costFunc.getAlpha();
+                    ////////////////////////////////////////////////////////////////////////////
+
+                    // Build the 3DMM using Alpha values ///////////////////////////////////////
+                    float res1 = 0.0f, res2 = 0.0f, res3 = 0.0f;
+                    for(int idx=0; idx<NUM_CASES; idx = idx + 3){
+
+                        for(int i=0; i <60; i++){
+                            res1 += alpha[i] * s[idx][i];
+                            res2 += alpha[i] * s[idx + 1][i];
+                            res3 += alpha[i] * s[idx +2][i];
+                        }
+                        modelShapeFinal[idx] = modelShape[idx] + res1;
+                        modelShapeFinal[idx + 1] = modelShape[idx + 1] + res2;
+                        modelShapeFinal[idx + 2] = modelShape[idx + 2] + res3;
+                    }////////////////////////////////////////////////////////////////////////////
+
+                    // Free resources
+                    bmpModel.recycle();
+                    ////////////////////////////////////////////////////////////////////////////////
+                    ////////////////////////////////////////////////////////////////////////////////
+                    ////////////////////////////////////////////////////////////////////////////////
+
+
+                    /*////////////////////////////////////////////////////////////////////////////////
                     // Compute Cost Function 10 times  ///// Core of the program ///////////////////
                     ////////////////////////////////////////////////////////////////////////////////
 
@@ -801,14 +895,14 @@ public class MainActivity extends Activity {
                         saveBitmaptoPNG(TEXTURE_DIRECTORY, "modelFace2D.png", bmpModel); //save
                         ////////////////////////////////////////////////////////////////////////////
 
-/*                      Sobel is applied inside the Cost Function
+*//*                      Sobel is applied inside the Cost Function
                         // Apply sobel
                         Bitmap sobelGx = BmpSobelGx(bmpModel);
                         Bitmap sobelGy = BmpSobelGy(bmpModel);
 
                         saveBitmaptoPNG(TEXTURE_DIRECTORY, "modelFace2DGx.png", sobelGx); //save
                         saveBitmaptoPNG(TEXTURE_DIRECTORY, "modelFace2DGy.png", sobelGy); //save
-*/
+*//*
 
                         // Build Cost Function /////////////////////////////////////////////////////
                         CostFunction costFunc =  new CostFunction(facePixels, modelPixels,
@@ -839,7 +933,7 @@ public class MainActivity extends Activity {
                     }
                     ////////////////////////////////////////////////////////////////////////////////
                     ////////////////////////////////////////////////////////////////////////////////
-                    ////////////////////////////////////////////////////////////////////////////////
+                    ////////////////////////////////////////////////////////////////////////////////*/
 
                     msg = mHandler.obtainMessage(EXTRACT_OK);
                 } catch (Exception e) {
