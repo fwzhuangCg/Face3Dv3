@@ -87,7 +87,7 @@ public class CostFunction {
             throw new IllegalArgumentException("inputFeatPts and modelFeatPts do not have the same size");
         }
 
-        // Initialy populate list, the value doesn't matter
+        // Initialy populate list with 0, the value doesn't matter
         for (int h = 0; h < 500;h++) {
             this.randomList.add(0);
         }
@@ -118,7 +118,8 @@ public class CostFunction {
     private float computeE(){
         float E = 0.0f, Ei, Ef;
         for(int it = 0; it < 10; it++){
-
+            Log.d(TAG,"*");
+            Log.d(TAG,"<E>");
             Log.d(TAG," alpha it = "+ it + " value = "+ alpha[it]);
 
             // Pick 500 Random Vertices Index each iteration
@@ -133,15 +134,17 @@ public class CostFunction {
                     (1/pow(sigmaF,2)) * Ef +
                     sum_Alpha_eigValS() +
                     sum_Beta_eigValT());
-            Log.d(TAG," sigmaI = "+ it + " sigmaI = "+ sigmaI);
-            Log.d(TAG," sigmaF = "+ it + " sigmaF = "+ sigmaF);
-            Log.d(TAG," it = "+ it + " sum_Alpha_eigValS() = "+ sum_Alpha_eigValS());
-            Log.d(TAG," it = "+ it + " sum_Beta_eigValT() = "+ sum_Beta_eigValT());
-            Log.d(TAG," it = "+ it + " Ei = "+ Ei);
-            Log.d(TAG," it = "+ it + " Ef = "+ Ef);
-            Log.d(TAG," it = "+ it + " E = "+ E);
-            Log.d(TAG,"*");
 
+            Log.d(TAG,"it = "+ it);
+            Log.d(TAG,"sigmaI = "+ sigmaI);
+            Log.d(TAG,"sigmaF = "+ sigmaF);
+            Log.d(TAG,"sum_Alpha_eigValS() = "+ sum_Alpha_eigValS());
+            Log.d(TAG,"sum_Beta_eigValT() = "+ sum_Beta_eigValT());
+            Log.d(TAG,"Ei = "+ Ei);
+            Log.d(TAG,"Ef = "+ Ef);
+            Log.d(TAG,"E = "+ E);
+            Log.d(TAG,"</E>");
+            Log.d(TAG,"*");
             computeNextAlpha(it); // Compute the alpha[it + 1] value
             sigmaI++;
             sigmaF--;
@@ -221,21 +224,23 @@ public class CostFunction {
                     + (1/pow(sigmaF,2)) * derivEf(it) * alpha[it]
                     + (2/pow(eigValS[it],2)));
         alphaStar = num/denum;
-
-        Log.d(TAG,"*******");
-            Log.d(TAG,"deriv2Ei["+it+"] = " + deriv2Ei(it));
-            Log.d(TAG,"deriv2Ef["+it+"] = " + deriv2Ef(it));
-            Log.d(TAG,"derivEi["+it+"] = " + derivEi(it));
-            Log.d(TAG,"derivEf["+it+"] = " + derivEf(it));
-            Log.d(TAG, "eigValS[" + it + "] = " + eigValS[it]);
-            Log.d(TAG, "square eigValS[" + it + "] = " + pow(eigValS[it], 2));
-            Log.d(TAG, "2 / eigValS[" + it + "] = " + 2/pow(eigValS[it],2));
-            Log.d(TAG,"num = "+ num);
-            Log.d(TAG,"denum = "+ denum);
-            Log.d(TAG,"alpha star = "+ alphaStar);
-        Log.d(TAG,"*****");
-
+        Log.d(TAG,"*");
+        Log.d(TAG,"<Alpha>");
+        Log.d(TAG,"it = " + it);
+        Log.d(TAG,"deriv2Ei["+it+"] = " + deriv2Ei(it));
+        Log.d(TAG,"deriv2Ef["+it+"] = " + deriv2Ef(it));
+        Log.d(TAG,"derivEi["+it+"] = " + derivEi(it));
+        Log.d(TAG,"derivEf["+it+"] = " + derivEf(it));
+        Log.d(TAG, "eigValS[" + it + "] = " + eigValS[it]);
+        Log.d(TAG, "square eigValS[" + it + "] = " + pow(eigValS[it], 2));
+        Log.d(TAG, "2 / eigValS[" + it + "] = " + 2/pow(eigValS[it],2));
+        Log.d(TAG,"num = "+ num);
+        Log.d(TAG,"denum = "+ denum);
+        Log.d(TAG,"alpha star = "+ alphaStar);
+        Log.d(TAG,"</Alpha>");
+        Log.d(TAG,"*");
         alpha[it + 1] = alpha[it] + lambda * (alphaStar - alpha[it]); // iteration
+
     }
 
     /*
