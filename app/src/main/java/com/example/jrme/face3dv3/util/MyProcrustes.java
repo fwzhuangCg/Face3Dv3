@@ -45,8 +45,8 @@ public class MyProcrustes {
 
         /* Recenter the points based on their mean ... */
         PointF cY =centroid(Y), cX = centroid(X), origin= new PointF(0,0);
-        RealMatrix X0 = translate(X, cX, origin);
-        RealMatrix Y0 = translate(Y, cY, origin);
+        RealMatrix X0 = translate(X, cX, origin); // translate X matrix to the origin (0,0)
+        RealMatrix Y0 = translate(Y, cY, origin); // same for Y
 
         /* Rotation Matrix */
         double theta = toRadians(rollAngle);

@@ -49,7 +49,7 @@ public class CostFunction {
     private float[][] s; // eigenVector // BIG
     private float[][][] subFSV;
 
-    private List<Pixel> model;
+    private List<Pixel> average;
     private List<Pixel> input;
     private RealMatrix inputFeatPts;
     private RealMatrix modelFeatPts;
@@ -63,12 +63,12 @@ public class CostFunction {
     private List<Integer> randomList = new ArrayList<>();
 
     /////////////////////////////////// Constructor ////////////////////////////////////////////////
-    public CostFunction(List<Pixel> input, List<Pixel> model, RealMatrix inputFeatPts,
-                        RealMatrix modelFeatPts, float [][] eigenVectors, Bitmap bmpModel) {
+    public CostFunction(List<Pixel> input, List<Pixel> average, RealMatrix inputFeatPts,
+                        RealMatrix modelFeatPts, float [][] eigenVectors, Bitmap bmpModel, float sigmaI, float sigmaF) {
 
         //this.featPtsIndex = readBin83PtIndex(CONFIG_DIRECTORY, INDEX83PT_FILE);
         this.input = input;
-        this.model = model;
+        this.average = average;
         this.inputFeatPts = inputFeatPts;
         this.modelFeatPts = modelFeatPts;
         this.k = inputFeatPts.getRowDimension(); // should be equal to 83
@@ -77,11 +77,11 @@ public class CostFunction {
         this.subFSV = readBinSFSV(CONFIG_DIRECTORY, SFSV_FILE);
 
         // Checking arguments
-        if(input.isEmpty() || model.isEmpty()){
-            throw new IllegalArgumentException("input or model list are empty");
+        if(input.isEmpty() || average.isEmpty()){
+            throw new IllegalArgumentException("input or average list are empty");
         }
-        if(input.size() != model.size()){
-            throw new IllegalArgumentException("input and model list do not have the same size");
+        if(input.size() != average.size()){
+            throw new IllegalArgumentException("input and average list do not have the same size");
         }
         if(modelFeatPts.getRowDimension() != k || modelFeatPts.getColumnDimension() != inputFeatPts.getColumnDimension()){
             throw new IllegalArgumentException("inputFeatPts and modelFeatPts do not have the same size");
@@ -96,8 +96,8 @@ public class CostFunction {
 
         // Initial Value
         alpha[0]= 1.0f / 60.0f;
-        sigmaI = 1f;
-        sigmaF = 10f;
+        this.sigmaI = sigmaI;
+        this.sigmaF = sigmaF;
 
         this.dxModel = computeSobelGx(bmpModel);
         this.dyModel = computeSobelGy(bmpModel);
@@ -117,38 +117,33 @@ public class CostFunction {
     /////////////////////////////////// Equation 21 ////////////////////////////////////////////////
     private float computeE(){
         float E = 0.0f, Ei, Ef;
-        for(int it = 0; it < 10; it++){
-            Log.d(TAG,"*");
-            Log.d(TAG,"<E>");
-            Log.d(TAG," alpha it = "+ it + " value = "+ alpha[it]);
+        Log.d(TAG,"*");
+        Log.d(TAG,"<E>");
 
-            // Pick 500 Random Vertices Index each iteration
-            Random r = new Random();
-            for(int h =0; h< 500; h++){
-                this.randomList.set(h, r.nextInt(end - start + 1) + start);
-            }
-
-            Ei = computeEi();
-            Ef = computeEf();
-            E = (float) ((1/pow(sigmaI,2)) * Ei +
-                    (1/pow(sigmaF,2)) * Ef +
-                    sum_Alpha_eigValS() +
-                    sum_Beta_eigValT());
-
-            Log.d(TAG,"it = "+ it);
-            Log.d(TAG,"sigmaI = "+ sigmaI);
-            Log.d(TAG,"sigmaF = "+ sigmaF);
-            Log.d(TAG,"sum_Alpha_eigValS() = "+ sum_Alpha_eigValS());
-            Log.d(TAG,"sum_Beta_eigValT() = "+ sum_Beta_eigValT());
-            Log.d(TAG,"Ei = "+ Ei);
-            Log.d(TAG,"Ef = "+ Ef);
-            Log.d(TAG,"E = "+ E);
-            Log.d(TAG,"</E>");
-            Log.d(TAG,"*");
-            computeNextAlpha(it); // Compute the alpha[it + 1] value
-            sigmaI++;
-            sigmaF--;
+        // Pick 500 Random Vertices Index each iteration
+        Random r = new Random();
+        for(int h =0; h< 500; h++){
+            this.randomList.set(h, r.nextInt(end - start + 1) + start);
         }
+
+        computeAlpha(); // Compute 60 alpha values
+        Ei = computeEi();
+        Ef = computeEf();
+        E = (float) ((1/pow(sigmaI,2)) * Ei +
+                (1/pow(sigmaF,2)) * Ef +
+                sum_Alpha_eigValS() +
+                sum_Beta_eigValT());
+
+        Log.d(TAG,"sigmaI = "+ sigmaI);
+        Log.d(TAG,"sigmaF = "+ sigmaF);
+        Log.d(TAG,"sum_Alpha_eigValS() = "+ sum_Alpha_eigValS());
+        Log.d(TAG,"sum_Beta_eigValT() = "+ sum_Beta_eigValT());
+        Log.d(TAG,"Ei = "+ Ei);
+        Log.d(TAG,"Ef = "+ Ef);
+        Log.d(TAG,"E = " + E);
+        Log.d(TAG,"</E>");
+        Log.d(TAG,"*");
+
         return E;
     }
 
@@ -210,36 +205,30 @@ public class CostFunction {
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
     /////////////////////////////////// Equation 31 ////////////////////////////////////////////////
-    private void computeNextAlpha(int it){
+    private void computeAlpha(){
 
-        float alphaStar;
+        float[] alphaStar = new float[60];
         float num, denum, lambda = 0.0001f; // initial 0.0001f;
 
-        num = (float) ((1/pow(sigmaI,2)) * deriv2Ei(it) * alpha[it]
-                    + (1/pow(sigmaF,2)) * deriv2Ef(it) * alpha[it]
-                    - (1/pow(sigmaI,2)) * derivEi(it) * alpha[it]
-                    - (1/pow(sigmaF,2)) * derivEf(it) * alpha[it]
-                    + (2/pow(eigValS[it],2)) * mean(alpha,it + 1));
-        denum = (float) ((1/pow(sigmaI,2)) * deriv2Ei(it) * alpha[it]
-                    + (1/pow(sigmaF,2)) * derivEf(it) * alpha[it]
-                    + (2/pow(eigValS[it],2)));
-        alphaStar = num/denum;
-        Log.d(TAG,"*");
-        Log.d(TAG,"<Alpha>");
-        Log.d(TAG,"it = " + it);
-        Log.d(TAG,"deriv2Ei["+it+"] = " + deriv2Ei(it));
-        Log.d(TAG,"deriv2Ef["+it+"] = " + deriv2Ef(it));
-        Log.d(TAG,"derivEi["+it+"] = " + derivEi(it));
-        Log.d(TAG,"derivEf["+it+"] = " + derivEf(it));
-        Log.d(TAG, "eigValS[" + it + "] = " + eigValS[it]);
-        Log.d(TAG, "square eigValS[" + it + "] = " + pow(eigValS[it], 2));
-        Log.d(TAG, "2 / eigValS[" + it + "] = " + 2/pow(eigValS[it],2));
-        Log.d(TAG,"num = "+ num);
-        Log.d(TAG,"denum = "+ denum);
-        Log.d(TAG,"alpha star = "+ alphaStar);
-        Log.d(TAG,"</Alpha>");
-        Log.d(TAG,"*");
-        alpha[it + 1] = alpha[it] + lambda * (alphaStar - alpha[it]); // iteration
+        for(int i=0; i<60-1; i++){
+            Log.d(TAG,"compute alpha, i = "+ i);
+            Log.d(TAG,"alpha[" + i + "] = " + alpha[i]);
+
+            num = (float) ((1/pow(sigmaI,2)) * deriv2Ei(i) * alpha[i]
+                    + (1/pow(sigmaF,2)) * deriv2Ef(i) * alpha[i]
+                    - (1/pow(sigmaI,2)) * derivEi(i) * alpha[i]
+                    - (1/pow(sigmaF,2)) * derivEf(i) * alpha[i]
+                    + (2/pow(eigValS[i],2)) * mean(alpha,i + 1));
+            denum = (float) ((1/pow(sigmaI,2)) * deriv2Ei(i) * alpha[i]
+                    + (1/pow(sigmaF,2)) * derivEf(i) * alpha[i]
+                    + (2/pow(eigValS[i],2)));
+            alphaStar[i] = num/denum;
+
+            alpha[i+1] = alpha[i] + lambda * (alphaStar[i] - alpha[i]); // iteration
+        }
+        int last = alpha.length - 1;
+        Log.d(TAG,"compute alpha, i = "+ last);
+        Log.d(TAG,"alpha[" + last + "] = " + alpha[last]);
 
     }
 
@@ -267,9 +256,9 @@ public class CostFunction {
 
     private float Imodel(int idx){
         float Imodel, tmp = 0.0f;
-        Imodel = 0.299f * model.get(idx).getR()
-                + 0.5876f * model.get(idx).getG()
-                + 0.114f * model.get(idx).getB();
+        Imodel = 0.299f * average.get(idx).getR()
+                + 0.5876f * average.get(idx).getG()
+                + 0.114f * average.get(idx).getB();
         for(int i =0; i<60; i++){
             tmp += alpha[i] * (s[idx * 3][i] + s[idx * 3 + 2][i]);
         }
@@ -330,8 +319,8 @@ public class CostFunction {
         float Gx, Gy;
         float res;
 
-        int x = model.get(idx).getX();
-        int y = model.get(idx).getY();
+        int x = average.get(idx).getX();
+        int y = average.get(idx).getY();
 
         Gx = (float) dxModel.get(x,y)[0];
         Gy = (float) dyModel.get(x,y)[0];
