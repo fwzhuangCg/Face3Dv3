@@ -765,7 +765,7 @@ public class MainActivity extends Activity {
                     ////////////////////////////////////////////////////////////////////////////////
 
                     Log.d(TAG,"averagePixels size = "+ modelPixels.size());
-                    Log.d(TAG,"Average Face load successfully");
+                    Log.d(TAG, "Average Face load successfully");
 
                     // Iteration ///////////////////////////////////////////////////////////////////
                     for(int it = 0; it < 10; it++){
