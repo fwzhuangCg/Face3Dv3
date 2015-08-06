@@ -29,13 +29,12 @@ public class CostFunction {
 
     private static final String TAG = "CostFunction";
 
-    private static final String CONFIG_DIRECTORY ="3DFace/DMM/config";
-    private static final String SHAPE_DIRECTORY ="3DFace/DMM/Shape";
-    private static final String TEXTURE_DIRECTORY ="3DFace/DMM/Texture";
+    private static final String CONFIG_DIRECTORY ="3DFace/simplification_bin/config";
+    private static final String SHAPE_DIRECTORY ="3DFace/simplification_bin/Shape";
+    private static final String TEXTURE_DIRECTORY ="3DFace/simplification_bin/Texture";
 
     private static final String EIG_SHAPE_FILE = "eig_Shape.dat";
     private static final String EIG_TEXTURE_FILE = "eig_Texture.dat";
-    private static final String INDEX83PT_FILE = "Featurepoint_Index.dat";
     private static final String SFSV_FILE = "subFeatureShapeVector.dat";
 
     private float E;
@@ -43,10 +42,11 @@ public class CostFunction {
     private float sigmaF;
 
     private float[] alpha = new float[60];
-    //private float[] beta = new float[60];
+    private float[] beta = new float[100];
     private float[] eigValS;
     private float[] eigValT;
-    private float[][] s; // eigenVector // BIG
+    private float[][] s; // eigenVector of Shape // BIG
+    private float[][] t; // eigenVector of Texture // BIG BIG
     private float[][][] subFSV;
 
     private List<Pixel> average;
@@ -58,13 +58,14 @@ public class CostFunction {
     private Mat dxModel;
     private Mat dyModel;
 
-    // range is [ 64140/3 ; 2 * 64140/3 ] for front face
-    private int start = 21380, end = 42760; // we select 500 random values within this range
+    // range is [ 8489/3 ; 2 * 8489/3 ] for front face
+    private int start = 2829, end = 5659; // we select 500 random values within this range
     private List<Integer> randomList = new ArrayList<>();
 
     /////////////////////////////////// Constructor ////////////////////////////////////////////////
     public CostFunction(List<Pixel> input, List<Pixel> average, RealMatrix inputFeatPts,
-                        RealMatrix modelFeatPts, float [][] eigenVectors, Bitmap bmpModel, float sigmaI, float sigmaF) {
+                        RealMatrix modelFeatPts, float [][] eigenVectorsS, float [][] eigenVectorsT,
+                        Bitmap bmpModel, float sigmaI, float sigmaF) {
 
         //this.featPtsIndex = readBin83PtIndex(CONFIG_DIRECTORY, INDEX83PT_FILE);
         this.input = input;
@@ -92,10 +93,12 @@ public class CostFunction {
             this.randomList.add(0);
         }
 
-        this.s = eigenVectors;
+        this.s = eigenVectorsS;
+        this.t = eigenVectorsT;
 
         // Initial Value
-        alpha[0]= 1.0f / 60.0f;
+        alpha[0] = 1.0f / 50.0f;
+        beta[0] = 1.0f / 90.0f;
         this.sigmaI = sigmaI;
         this.sigmaF = sigmaF;
 
@@ -111,6 +114,9 @@ public class CostFunction {
     /////////////////////////////////// Getter /////////////////////////////////////////////////////
     public float[] getAlpha() {
         return alpha;
+    }
+    public float[] getBeta() {
+        return beta;
     }
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -149,7 +155,7 @@ public class CostFunction {
 
     private float sum_Alpha_eigValS(){
         float res = 0.0f;
-        for(int i=0;i<60;i++){
+        for(int i=0; i<60; i++){
             res += pow(alpha[i], 2)/pow(eigValS[i], 2);
         }
         return res;
@@ -157,8 +163,8 @@ public class CostFunction {
 
     private float sum_Beta_eigValT(){
         float res = 0.0f;
-        for(int i=0;i<60;i++){
-            res += pow(alpha[i], 2)/pow(eigValT[i], 2);
+        for(int i=0 ; i<100;i++){
+            res += pow(beta[i], 2)/pow(eigValT[i], 2);
         }
         return res;
     }
@@ -208,7 +214,7 @@ public class CostFunction {
     private void computeAlpha(){
 
         float[] alphaStar = new float[60];
-        float num, denum, lambda = 0.0001f; // initial 0.0001f;
+        float num, denum, lambda = 0.000005f; // initial 0.0001f;
 
         for(int i=0; i<60-1; i++){
             Log.d(TAG,"compute alpha, i = "+ i);

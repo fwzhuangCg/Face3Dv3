@@ -118,19 +118,20 @@ public class MainActivity extends Activity {
 
     List<Pixel> facePixels, modelPixels;
 
-    private static final String CONFIG_DIRECTORY = "3DFace/DMM/config";
+    private static final String CONFIG_DIRECTORY = "3DFace/simplification_bin/config";
     private static final String MODEL_2D_83PT_FILE = "ModelPoints2D.dat";
 
-    private static final String TEXTURE_DIRECTORY ="3DFace/DMM/Texture";
-    private static final String SHAPE_DIRECTORY ="3DFace/DMM/Shape";
+    private static final String TEXTURE_DIRECTORY ="3DFace/simplification_bin/Texture";
+    private static final String SHAPE_DIRECTORY ="3DFace/simplification_bin/Shape";
 
-    private static final String AVERAGE_TEXTURE_FILE = "averageTextureVector.dat";
-    private static final String AVERAGE_SHAPE_FILE = "averageShapeVector.dat";
-    private static final String AVERAGE_SHAPE_2D_FILE = "averageShapeVector2D.dat";
-    private static final String FEATURE_S_FILE = "featureVector_Shape.dat"; //BIG
-    private static final String MODEL_SHAPE_FILE = "modelShapeVector.dat";
-    private static final String INDEX83PT_FILE = "Featurepoint_Index.dat";
-    private static final int NUM_CASES = fileSize(TEXTURE_DIRECTORY, AVERAGE_TEXTURE_FILE)/BYTES_PER_FLOAT;
+    private static final String AVERAGE_TEXTURE_FILE = "texture.dat";
+    private static final String AVERAGE_SHAPE_FILE = "shape.dat";
+    private static final String AVERAGE_SHAPE_2D_FILE = "shape2D.dat";
+    private static final String FEATURE_S_FILE = "featureshape.dat"; //BIG
+    private static final String FEATURE_T_FILE = "featuretexture.dat"; //BIG BIG
+    private static final String MODEL_SHAPE_FILE = "modelshape.dat";
+    private static final String INDEX83PT_FILE = "modelpoint_index.dat";
+    private static final int NUM_CASES_POINTS = fileSize(TEXTURE_DIRECTORY, AVERAGE_TEXTURE_FILE)/BYTES_PER_FLOAT;
 
     private float[] modelShapeFinal;
 
@@ -565,11 +566,12 @@ public class MainActivity extends Activity {
                     RealMatrix T = mProc.getT();
                     Log.d(TAG, "T = " + T);
 
-                    int NUM_CASES_2 = fileSize(SHAPE_DIRECTORY, AVERAGE_SHAPE_2D_FILE) / BYTES_PER_FLOAT;
-                    int k = NUM_CASES_2 / 2; // Number of Lines == Row Dimension
+                    int NUM_CASES_POINTS_2 = fileSize(SHAPE_DIRECTORY, AVERAGE_SHAPE_2D_FILE) / BYTES_PER_FLOAT;
+                    int k = NUM_CASES_POINTS_2 / 2; // Number of Lines == Row Dimension
+                    Log.d(TAG,"k = " + k);
                     RealMatrix averageShape2D =
                             readBin2DShapetoMatrix(SHAPE_DIRECTORY, AVERAGE_SHAPE_2D_FILE, k);
-                    // Adapt the translation matrix to the new dimension (64140 rows)
+                    // Adapt the translation matrix to the new dimension (8489 rows)
                     double tx = T.getEntry(0, 0), ty = T.getEntry(0, 1);// +15; // +18; // Higher value the face go down
                     RealMatrix tt = new Array2DRowRealMatrix(k, 2);
                     for (int i = 0; i < k; i++) {
@@ -581,7 +583,7 @@ public class MainActivity extends Activity {
                     RealMatrix averageShape2DFtPt = new Array2DRowRealMatrix(83, 2);
                     int[] landmarks83Index = readBin83PtIndex(CONFIG_DIRECTORY, INDEX83PT_FILE);
                     for (int i = 0; i<landmarks83Index.length; i++) { //
-                        int tmp = landmarks83Index[i] + 1; // This +1 is strange but it works
+                        int tmp = landmarks83Index[i] - 1; // -1 because the index starts at 1 in modelpoint_index file
                         averageShape2DFtPt.setEntry(i,0,averageShape2D.getEntry(tmp,0));
                         averageShape2DFtPt.setEntry(i,1, averageShape2D.getEntry(tmp,1));
                     }
@@ -699,19 +701,21 @@ public class MainActivity extends Activity {
                     ////////////////////////////////////////////////////////////////////////////////
 
                     // Initialisation
-                    modelShapeFinal = new float[NUM_CASES];
+                    modelShapeFinal = new float[NUM_CASES_POINTS];
                     modelPixels = new ArrayList<>();
-                    float sigmaI = 1f, sigmaF = 10f;
-                    float[] averageTexture = readBinFloat(TEXTURE_DIRECTORY, AVERAGE_TEXTURE_FILE, NUM_CASES);
-                    float[] averageShape = readBinFloat(SHAPE_DIRECTORY, AVERAGE_SHAPE_FILE, NUM_CASES);
-                    Log.d(TAG,"NUM CASES = "+ NUM_CASES);
+                    float[] averageTexture = readBinFloat(TEXTURE_DIRECTORY, AVERAGE_TEXTURE_FILE, NUM_CASES_POINTS);
+                    float[] averageShape = readBinFloat(SHAPE_DIRECTORY, AVERAGE_SHAPE_FILE, NUM_CASES_POINTS);
+                    Log.d(TAG,"NUM CASES POINTS = "+ NUM_CASES_POINTS);
                     Log.d(TAG,"averageTexture size = "+ averageTexture.length);
                     Log.d(TAG,"averageShape size = "+ averageShape.length);
                     float [][] s = readBinFloatDoubleArray(SHAPE_DIRECTORY,
-                            FEATURE_S_FILE, 192420, 60); // Load the BIG File
-
+                            FEATURE_S_FILE, NUM_CASES_POINTS, 60); // Load the feature shape File
+                   float [][] t = readBinFloatDoubleArray(TEXTURE_DIRECTORY,
+                            FEATURE_T_FILE, NUM_CASES_POINTS, 100); // feature texture
+                    float sigmaI = 10f, sigmaF = 1f;
+/*
                     // Model Pixels
-                    for(int i=0, idx=0; i<NUM_CASES; i=i+3,idx++){
+                    for(int i=0, idx=0; i<NUM_CASES_POINTS; i=i+3,idx++){
                         //get R G B and X Y
                         int rgb = Color.rgb((int) averageTexture[i], (int) averageTexture[i + 1], (int) averageTexture[i + 2]);
                         Pixel p = new Pixel(averageShape[i], averageShape[i + 2], rgb); // 2nd Constructor with xF and yF
@@ -738,37 +742,37 @@ public class MainActivity extends Activity {
                     Log.d(TAG, " min Y = " + maxMin[3]);
 
                     for (Pixel p : modelPixels) {
-                        float a = p.getXF();
-                        float b = p.getYF();
-                        int x = (int) ((250-1) * ( p.getXF() - maxMin[1])/ (maxMin[0] - maxMin[1]));
-                        int y = (int) ((250-1) * ( p.getYF() - maxMin[3]) / (maxMin[2] - maxMin[3]));
-                        // Set the Pixel Location (int) of Model Image to ModelPixels
-                        p.setX(x);
-                        p.setY(y);
-                        try{
-                            bmpModel.setPixel( x, y, p.getRGB());
-                        } catch(Exception e){
-                            // if failed => print what was wrong
-                            Log.e(TAG, "a = " + a);
-                            Log.e(TAG, "b = " + b);
-                            Log.e(TAG, "x = " + x);
-                            Log.e(TAG, "y = " + y);
-                            throw new IllegalArgumentException("Out of border");
-                        }
+                    float a = p.getXF();
+                    float b = p.getYF();
+                    int x = (int) ((250-1) * ( p.getXF() - maxMin[1])/ (maxMin[0] - maxMin[1]));
+                    int y = (int) ((250-1) * ( p.getYF() - maxMin[3]) / (maxMin[2] - maxMin[3]));
+                    // Set the Pixel Location (int) of Model Image to ModelPixels
+                    p.setX(x);
+                    p.setY(y);
+                    try{
+                        bmpModel.setPixel( x, y, p.getRGB());
+                    } catch(Exception e){
+                        // if failed => print what was wrong
+                        Log.e(TAG, "a = " + a);
+                        Log.e(TAG, "b = " + b);
+                        Log.e(TAG, "x = " + x);
+                        Log.e(TAG, "y = " + y);
+                        throw new IllegalArgumentException("Out of border");
                     }
-                    // fill the pixels hole
-                    fillHole1(bmpModel);
-                    fillHole2(bmpModel);
-                    fillHole2(bmpModel); // again
+                }
+                // fill the pixels hole
+                fillHole1(bmpModel);
+                fillHole2(bmpModel);
+                fillHole2(bmpModel); // again
 
-                    saveBitmaptoPNG(TEXTURE_DIRECTORY, "modelFace2D.png", bmpModel); //save
-                    ////////////////////////////////////////////////////////////////////////////////
+                saveBitmaptoPNG(TEXTURE_DIRECTORY, "averageFace2D.png", bmpModel); //save
+                ////////////////////////////////////////////////////////////////////////////////
 
                     Log.d(TAG,"averagePixels size = "+ modelPixels.size());
                     Log.d(TAG, "Average Face load successfully");
 
                     // Iteration ///////////////////////////////////////////////////////////////////
-                    for(int it = 0; it < 10; it++){
+                    for(int it = 0; it < 1; it++){
 
                         // Build Cost Function /////////////////////////////////////////////////////
                         CostFunction costFunc =  new CostFunction(facePixels, modelPixels,
@@ -778,7 +782,7 @@ public class MainActivity extends Activity {
 
                         // Build the 3DMM using Alpha values ///////////////////////////////////////
                         float res1 = 0.0f, res2 = 0.0f, res3 = 0.0f;
-                        for(int idx=0; idx<NUM_CASES; idx = idx + 3){
+                        for(int idx=0; idx<NUM_CASES_POINTS; idx = idx + 3){
 
                             for(int i=0; i <60; i++){
                                 res1 += alpha[i] * s[idx][i];
@@ -792,15 +796,15 @@ public class MainActivity extends Activity {
                         ////////////////////////////////////////////////////////////////////////////
 
                         // Update sigmaF and sigmaI
-                        sigmaF++; // no longer rely on Ef at final iteration
-                        sigmaI--; // put more weight on Ei
+                        sigmaF++; // no longer rely on Ef at the end
+                        sigmaI--; // put more and more weight on Ei
                     }
 
                     // Free resources
                     bmpModel.recycle();
                     ////////////////////////////////////////////////////////////////////////////////
                     ////////////////////////////////////////////////////////////////////////////////
-                    ////////////////////////////////////////////////////////////////////////////////
+                    ////////////////////////////////////////////////////////////////////////////////*/
 
                     msg = mHandler.obtainMessage(EXTRACT_OK);
                 } catch (Exception e) {
@@ -828,8 +832,8 @@ public class MainActivity extends Activity {
                 Message msg = null;
 
                 try {
-                    IOHelper.convertPixelsToBin(facePixels, "3DFace/DMM/Texture/faceTexture.dat");
-                    writeBinFloatScale(SHAPE_DIRECTORY, MODEL_SHAPE_FILE, modelShapeFinal);
+                    IOHelper.convertPixelsToBin(facePixels, "3DFace/simplification_bin/Texture/faceTexture.dat");
+                    //writeBinFloatScale(SHAPE_DIRECTORY, MODEL_SHAPE_FILE, modelShapeFinal);
                     msg = mHandler.obtainMessage(SAVE_OK);
                 } catch (Exception e) {
                     e.printStackTrace();

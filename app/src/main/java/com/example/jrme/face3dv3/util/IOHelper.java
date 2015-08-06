@@ -182,7 +182,11 @@ public class IOHelper {
         int i = 0;
         float[] tab = new float[size];
 
-        float minX = -90.3540f, minY = -22.1150f, minZ = -88.7720f, maxX = 101.3830f, maxY = 105.1860f, maxZ = 102.0530f;
+        // theses values was for 64140 points average shape
+        //float minX = -90.3540f, minY = -22.1150f, minZ = -88.7720f, maxX = 101.3830f, maxY = 105.1860f, maxZ = 102.0530f;
+
+        // values for average shape after simplification (8489 points)
+        float minX = -85.4616f, minY = -18.0376f, minZ = -90.4051f, maxX = 95.4549f, maxY = 115.0088f, maxZ = 106.7329f;
 
         float deltaX = (maxX - minX) / 2.0f;
         float deltaY = (maxY - minY) / 2.0f;
@@ -297,9 +301,9 @@ public class IOHelper {
     }
 
     /*
-    * Read the index binary file
+    * Read int binary file
     */
-    public static int[] readBinIndexArray(String dir, String fileName, int size) {
+    public static int[] readBinIntArray(String dir, String fileName, int size) {
         int x;
         int i = 0;
         int[] tab = new int[size];
