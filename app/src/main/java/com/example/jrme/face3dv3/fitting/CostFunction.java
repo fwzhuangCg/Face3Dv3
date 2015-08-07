@@ -49,8 +49,9 @@ public class CostFunction {
     private float[][] t; // eigenVector of Texture // BIG BIG
     private float[][][] subFSV;
 
-    private List<Pixel> average;
+    private List<Pixel> model;
     private List<Pixel> input;
+    private List<Pixel> average;
     private RealMatrix inputFeatPts;
     private RealMatrix modelFeatPts;
     //private int[] featPtsIndex;
@@ -63,26 +64,33 @@ public class CostFunction {
     private List<Integer> randomList = new ArrayList<>();
 
     /////////////////////////////////// Constructor ////////////////////////////////////////////////
-    public CostFunction(List<Pixel> input, List<Pixel> average, RealMatrix inputFeatPts,
+    public CostFunction(List<Pixel> input, List<Pixel> average, List<Pixel> model, RealMatrix inputFeatPts,
                         RealMatrix modelFeatPts, float [][] eigenVectorsS, float [][] eigenVectorsT,
                         Bitmap bmpModel, float sigmaI, float sigmaF) {
 
         //this.featPtsIndex = readBin83PtIndex(CONFIG_DIRECTORY, INDEX83PT_FILE);
         this.input = input;
         this.average = average;
+        this.model = model;
         this.inputFeatPts = inputFeatPts;
         this.modelFeatPts = modelFeatPts;
         this.k = inputFeatPts.getRowDimension(); // should be equal to 83
         this.eigValS = readBinFloat(SHAPE_DIRECTORY, EIG_SHAPE_FILE, 60);
-        this.eigValT = readBinFloat(TEXTURE_DIRECTORY, EIG_TEXTURE_FILE, 60);
+        this.eigValT = readBinFloat(TEXTURE_DIRECTORY, EIG_TEXTURE_FILE, 100);
         this.subFSV = readBinSFSV(CONFIG_DIRECTORY, SFSV_FILE);
 
         // Checking arguments
-        if(input.isEmpty() || average.isEmpty()){
-            throw new IllegalArgumentException("input or average list are empty");
+        if(input.isEmpty() || average.isEmpty() || model.isEmpty()){
+            throw new IllegalArgumentException("input or average or model list are empty");
+        }
+        if(input.size() != model.size()){
+            throw new IllegalArgumentException("input and model list do not have the same size");
         }
         if(input.size() != average.size()){
             throw new IllegalArgumentException("input and average list do not have the same size");
+        }
+        if(average.size() != model.size()){
+            throw new IllegalArgumentException("average and model list do not have the same size");
         }
         if(modelFeatPts.getRowDimension() != k || modelFeatPts.getColumnDimension() != inputFeatPts.getColumnDimension()){
             throw new IllegalArgumentException("inputFeatPts and modelFeatPts do not have the same size");
@@ -97,8 +105,8 @@ public class CostFunction {
         this.t = eigenVectorsT;
 
         // Initial Value
-        alpha[0] = 1.0f / 50.0f;
-        beta[0] = 1.0f / 90.0f;
+        alpha[0] = 1.0f / 60.0f;
+        beta[0] = 1.0f / 100.0f;
         this.sigmaI = sigmaI;
         this.sigmaF = sigmaF;
 
@@ -133,6 +141,8 @@ public class CostFunction {
         }
 
         computeAlpha(); // Compute 60 alpha values
+        computeBeta(); // Compute 100 beta values
+
         Ei = computeEi();
         Ef = computeEf();
         E = (float) ((1/pow(sigmaI,2)) * Ei +
@@ -175,7 +185,7 @@ public class CostFunction {
         float res = 0.0f;
 
         for(int idx : randomList) {
-            res += pow(Iinput(idx) - Imodel(idx),2);
+            res += pow(GrayInput(idx) - GrayModelAlpha(idx), 2);
         }
         return res;
     }
@@ -214,19 +224,19 @@ public class CostFunction {
     private void computeAlpha(){
 
         float[] alphaStar = new float[60];
-        float num, denum, lambda = 0.000005f; // initial 0.0001f;
+        float num, denum, lambda = 0.0001f; // initial 0.0001f;   or 0.000005f
 
         for(int i=0; i<60-1; i++){
             Log.d(TAG,"compute alpha, i = "+ i);
             Log.d(TAG,"alpha[" + i + "] = " + alpha[i]);
 
-            num = (float) ((1/pow(sigmaI,2)) * deriv2Ei(i) * alpha[i]
-                    + (1/pow(sigmaF,2)) * deriv2Ef(i) * alpha[i]
-                    - (1/pow(sigmaI,2)) * derivEi(i) * alpha[i]
-                    - (1/pow(sigmaF,2)) * derivEf(i) * alpha[i]
+            num = (float) ((1/pow(sigmaI,2)) * deriv2EiAlpha(i) * alpha[i]
+                    + (1/pow(sigmaF,2)) * deriv2EfAlpha(i) * alpha[i]
+                    - (1/pow(sigmaI,2)) * derivEiAlpha(i) * alpha[i]
+                    - (1/pow(sigmaF,2)) * derivEfAlpha(i) * alpha[i]
                     + (2/pow(eigValS[i],2)) * mean(alpha,i + 1));
-            denum = (float) ((1/pow(sigmaI,2)) * deriv2Ei(i) * alpha[i]
-                    + (1/pow(sigmaF,2)) * derivEf(i) * alpha[i]
+            denum = (float) ((1/pow(sigmaI,2)) * deriv2EiAlpha(i) * alpha[i]
+                    + (1/pow(sigmaF,2)) * derivEfAlpha(i) * alpha[i]
                     + (2/pow(eigValS[i],2)));
             alphaStar[i] = num/denum;
 
@@ -235,7 +245,6 @@ public class CostFunction {
         int last = alpha.length - 1;
         Log.d(TAG,"compute alpha, i = "+ last);
         Log.d(TAG,"alpha[" + last + "] = " + alpha[last]);
-
     }
 
     /*
@@ -248,10 +257,58 @@ public class CostFunction {
         }
         return sum/end;
     }
+
+    private void computeBeta(){
+
+        float[] betaStar = new float[100];
+        float num, denum, lambda = 0.0001f; // initial 0.0001f;
+
+        for(int i=0; i<100-1; i++){
+            Log.d(TAG,"compute beta, i = "+ i);
+            Log.d(TAG,"beta[" + i + "] = " + beta[i]);
+
+            num = (float) ((1/pow(sigmaI,2)) * deriv2EiBeta(i) * beta[i]
+                    - (1/pow(sigmaI,2)) * derivEiBeta(i));
+            denum = (float) ((1/pow(sigmaI,2)) * deriv2EiBeta(i)
+                    + (2/pow(eigValT[i],2)));
+            betaStar[i] = num/denum;
+
+            beta[i+1] = beta[i] + lambda * (betaStar[i] - beta[i]); // iteration
+        }
+        int last = beta.length - 1;
+        Log.d(TAG, "compute beta, i = " + last);
+        Log.d(TAG, "beta[" + last + "] = " + beta[last]);
+    }
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
-    /////////////////////////////////// Calculate Gray-Level I /////////////////////////////////////
-    private float Iinput(int idx){
+    /////////////////////////////////// 3 Channels I and Gray-level ////////////////////////////////
+    private RealMatrix IinputBeta(int idx){
+        RealMatrix res = new Array2DRowRealMatrix(3,1);
+
+        res.setEntry(0, 0, input.get(idx).getR());
+        res.setEntry(1, 0, input.get(idx).getG());
+        res.setEntry(2, 0, input.get(idx).getB());
+
+        return res;
+    }
+
+    private RealMatrix ImodelBeta(int idx){
+        float tmp1 = 0.0f, tmp2 = 0.0f, tmp3 = 0.0f;
+        RealMatrix res = new Array2DRowRealMatrix(3,1);
+
+        for(int i =0; i< 100; i++){
+            tmp1 += beta[i] * t[idx * 3][i];
+            tmp2 += beta[i] * t[idx * 3 + 1][i];
+            tmp3 += beta[i] * t[idx * 3 + 2][i];
+        }
+        res.setEntry(0, 0, average.get(idx).getR() + tmp1);
+        res.setEntry(1, 0, average.get(idx).getG() + tmp2);
+        res.setEntry(2, 0, average.get(idx).getB() + tmp3);
+
+        return res;
+    }
+
+    private float GrayInput(int idx){
         float res;
         // Gray-Level calculation : I = 0.299R + 0.5876G + 0.114B
         res = 0.299f * input.get(idx).getR()
@@ -260,7 +317,7 @@ public class CostFunction {
         return res;
     }
 
-    private float Imodel(int idx){
+    private float GrayModelAlpha(int idx){
         float Imodel, tmp = 0.0f;
         Imodel = 0.299f * average.get(idx).getR()
                 + 0.5876f * average.get(idx).getG()
@@ -272,29 +329,29 @@ public class CostFunction {
     }
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
-    /////////////////////////////////// Derivation Function ////////////////////////////////////////
-    private float derivEi(int i){
+    /////////////////////////////////// Derivation Function with Alpha /////////////////////////////
+    private float derivEiAlpha(int i){
         float res = 0.0f;
 
         for(int idx : randomList) {
             res += -2.0f
-                    * abs(Iinput(idx) - Imodel(idx))
-                    * derivImodel(i, idx);
+                    * abs(GrayInput(idx) - GrayModelAlpha(idx))
+                    * derivImodelAlpha(i, idx);
         }
         return res;
     }
 
-    private float deriv2Ei(int i){
+    private float deriv2EiAlpha(int i){
         float res = 0.0f;
 
         for(int idx : randomList) {
             res += 2.0f
-                    * pow(derivImodel(i, idx), 2);
+                    * pow(derivImodelAlpha(i, idx), 2);
         }
         return res;
     }
 
-    private float derivEf(int i){
+    private float derivEfAlpha(int i){
         float res=0.0f, xIn, yIn, xA, yA, tmp = 0.0f;
         for(int j=0; j<k; j++) {
             xIn = (float) inputFeatPts.getEntry(j,0);
@@ -313,7 +370,7 @@ public class CostFunction {
         return res;
     }
 
-    private float deriv2Ef(int i){
+    private float deriv2EfAlpha(int i){
         float res = 0.0f;
         for(int j=0; j<k; j++) {
             res += 2.0f * pow(alpha[i] * (subFSV[i][j][0] + subFSV[i][j][2]), 2);
@@ -321,7 +378,7 @@ public class CostFunction {
         return res;
     }
 
-    private float derivImodel(int i, int idx){
+    private float derivImodelAlpha(int i, int idx){
         float Gx, Gy;
         float res;
 
@@ -333,6 +390,34 @@ public class CostFunction {
 
         res = Gx * s[idx * 3][i] + Gy * s[idx * 3 + 2][i];
 
+        return res;
+    }
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /////////////////////////////////// Derivation Function with Beta //////////////////////////////
+    private float derivEiBeta(int i){
+        float res = 0.0f;
+        RealMatrix tmp, Iinput, Imodel;
+
+        for(int idx : randomList) {
+
+            Iinput = IinputBeta(idx);
+            Imodel = ImodelBeta(idx);
+            tmp = Iinput.subtract(Imodel);
+
+            res += -2.0f
+                    * (tmp.getEntry(0,0) * t[idx * 3][i] + tmp.getEntry(1,0) * t[idx * 3 + 1][i] + tmp.getEntry(2,0) * t[idx * 3 + 2][i]);
+        }
+        return res;
+    }
+
+    private float deriv2EiBeta(int i){
+        float res = 0.0f;
+
+        for(int idx : randomList) {
+            res += 2.0f
+                    * pow((t[idx * 3][i] + t[idx * 3 + 1][i] + t[idx * 3 + 2][i]), 2);
+        }
         return res;
     }
     ////////////////////////////////////////////////////////////////////////////////////////////////

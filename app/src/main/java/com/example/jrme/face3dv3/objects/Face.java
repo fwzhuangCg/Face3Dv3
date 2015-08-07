@@ -34,15 +34,15 @@ public class Face {
     private static final String SHAPE_DIRECTORY ="3DFace/simplification_bin/Shape";
     private static final String TEXTURE_DIRECTORY ="3DFace/simplification_bin/Texture";
 
-    private static final String AVERAGE_SHAPE_FILE = "shape.dat";
+    //private static final String AVERAGE_SHAPE_FILE = "shape.dat";
     //private static final String AVERAGE_TEXTURE_FILE = "texture.dat";
-    //private static final String MODEL_SHAPE_FILE = "modelShapeVector.dat";
+    private static final String MODEL_SHAPE_FILE = "modelshape.dat";
     private static final String MODEL_TEXTURE_FILE = "faceTexture.dat";
     private static final String MESH_FILE = "triangles.dat";
     private static final String INDEX83PT_FILE = "modelpoint_index.dat";
-    private static final String INDEX_FILE = "index.dat";
+    //private static final String INDEX_FILE = "index.dat";
 
-    private static final int NUM_CASES_POINTS = fileSize(SHAPE_DIRECTORY, AVERAGE_SHAPE_FILE)/BYTES_PER_FLOAT;
+    private static final int NUM_CASES_POINTS = fileSize(SHAPE_DIRECTORY, MODEL_SHAPE_FILE)/BYTES_PER_FLOAT;
     private static final int NUM_POINTS = NUM_CASES_POINTS/POSITION_COMPONENT_COUNT;
     private static final int NUM_CASES_TRIANGLES = fileSize(CONFIG_DIRECTORY, MESH_FILE)/BYTES_PER_INT;
     private static final int NUM_TRIANGLES = NUM_CASES_TRIANGLES/INDEX_COMPONENT_COUNT;
@@ -61,8 +61,8 @@ public class Face {
         Log.d(TAG, "NUM_TRIANGLES = " + NUM_TRIANGLES);
         //Log.d(TAG, "NUM_INDEX = " + NUM_INDEX);
 
-        //float[] shapeArray = readBinShapeArray(SHAPE_DIRECTORY, MODEL_SHAPE_FILE, NUM_CASES);
-        float[] shapeArray = readBinAverageShapeArray(SHAPE_DIRECTORY, AVERAGE_SHAPE_FILE, NUM_CASES_POINTS);
+        float[] shapeArray = readBinShapeArray(SHAPE_DIRECTORY, MODEL_SHAPE_FILE, NUM_CASES_POINTS);
+        //float[] shapeArray = readBinAverageShapeArray(SHAPE_DIRECTORY, AVERAGE_SHAPE_FILE, NUM_CASES_POINTS);
         float[] textureArray = readBinTextureArray(TEXTURE_DIRECTORY, MODEL_TEXTURE_FILE, NUM_CASES_POINTS);
         int[] trianglesArray = readBinIntArray(CONFIG_DIRECTORY, MESH_FILE, NUM_CASES_TRIANGLES);
 
