@@ -133,8 +133,8 @@ public class MainActivity extends Activity {
     private static final String INDEX83PT_FILE = "modelpoint_index.dat";
     private static final int NUM_CASES_POINTS = fileSize(TEXTURE_DIRECTORY, AVERAGE_TEXTURE_FILE)/BYTES_PER_FLOAT;
 
-    private float[] modelShapeFinal;
-    private float[] modelTextureFinal;
+    private float[] modelShape;
+    private float[] modelTexture;
 
     // The OpenCV loader callback.
     private BaseLoaderCallback mLoaderCallback =
@@ -698,7 +698,8 @@ public class MainActivity extends Activity {
                     ////////////////////////////////////////////////////////////////////////////////
 
                     // Initialisation
-                    modelShapeFinal = new float[NUM_CASES_POINTS];
+                    modelShape = new float[NUM_CASES_POINTS];
+                    modelTexture = new float[NUM_CASES_POINTS];
                     modelPixels = new ArrayList<>();
                     averagePixels = new ArrayList<>();
                     float[] averageTexture = readBinFloat(TEXTURE_DIRECTORY, AVERAGE_TEXTURE_FILE, NUM_CASES_POINTS);
@@ -711,12 +712,47 @@ public class MainActivity extends Activity {
                    float [][] t = readBinFloatDoubleArray(TEXTURE_DIRECTORY,
                             FEATURE_T_FILE, NUM_CASES_POINTS, 100); // feature texture
                     float sigmaI = 10f, sigmaF = 1f;
-                    modelShapeFinal = averageShape;
-                    modelTextureFinal = averageTexture;
+                    float[] alpha = new float[60];
+                    float[] beta = new float[100];
+                    for (int i = 0; i < 60; i++) {
+                        alpha[i] = 1.0f / 60.0f; // initial alpha value
+                    }
+                    for (int i = 0; i < 100; i++) {
+                        beta[i] = 1.0f / 100.0f; // initial beta value
+                    }
+                    // Initial Shape Model with initial alpha //////////////////////////////////////
+                    float res1 = 0.0f, res2 = 0.0f, res3 = 0.0f;
+                    for(int idx=0; idx<NUM_CASES_POINTS; idx = idx + 3){
+
+                        for(int i=0; i <60; i++){
+                            res1 += alpha[i] * s[idx][i];
+                            res2 += alpha[i] * s[idx + 1][i];
+                            res3 += alpha[i] * s[idx +2][i];
+                        }
+                        modelShape[idx] = averageShape[idx] + res1;
+                        modelShape[idx + 1] = averageShape[idx + 1] + res2;
+                        modelShape[idx + 2] = averageShape[idx + 2] + res3;
+                    }
+                    ////////////////////////////////////////////////////////////////////////////////
+
+                    // Initial Texture Model with initial beta /////////////////////////////////////
+                    float res4 = 0.0f, res5 = 0.0f, res6 = 0.0f;
+                    for(int idx=0; idx<NUM_CASES_POINTS; idx = idx + 3){
+
+                        for(int i=0; i <100; i++){
+                            res4 += beta[i] * t[idx][i];
+                            res5 += beta[i] * t[idx + 1][i];
+                            res6 += beta[i] * t[idx +2][i];
+                        }
+                        modelTexture[idx] = averageTexture[idx] + res4;
+                        modelTexture[idx + 1] = averageTexture[idx + 1] + res5;
+                        modelTexture[idx + 2] = averageTexture[idx + 2] + res6;
+                    }
+                    ////////////////////////////////////////////////////////////////////////////////
 
                     // Model 83 Feature Points
                     for (int i = 0; i<landmarks83Index.length; i++) {
-                        int tmp = landmarks83Index[i] + 1; // This +1 is strange but it works
+                        int tmp = landmarks83Index[i] - 1; // -1 because the index starts at 1 in modelpoint_index file
                         xModel83FtPt.setEntry(i, 0, averageShape2DRes.getEntry(tmp,0));
                         xModel83FtPt.setEntry(i, 1, averageShape2DRes.getEntry(tmp,1));
                         Log.d(TAG, "xModel83FtPt with tmp = " + tmp + "(" + xModel83FtPt.getEntry(i,0)
@@ -727,19 +763,19 @@ public class MainActivity extends Activity {
                     Log.d(TAG, "Average Face load successfully");
 
                     // Iteration ///////////////////////////////////////////////////////////////////
-                    for(int it = 0; it < 10; it++){
+                    for(int it = 0; it < 3; it++){
 
                         // Build Model Pixels (first iteration Average Face data)
                         // Contains Shape and Texture data
                         for(int i=0, idx=0; i<NUM_CASES_POINTS; i=i+3,idx++){
                             //get R G B and X Y
-                            int rgb = Color.rgb((int) modelTextureFinal[i], (int) modelTextureFinal[i + 1], (int) modelTextureFinal[i + 2]);
-                            Pixel p = new Pixel(modelShapeFinal[i], modelShapeFinal[i + 2], rgb); // 2nd Constructor with xF and yF
+                            int rgb = Color.rgb((int) modelTexture[i], (int) modelTexture[i + 1], (int) modelTexture[i + 2]);
+                            Pixel p = new Pixel(modelShape[i], modelShape[i + 2], rgb); // 2nd Constructor with xF and yF
                             // First iteration we add to the list
                             if(it == 0){
                                 modelPixels.add(idx, p);
                                 averagePixels.add(idx, p);
-                            } else{ // Others iterations we replace at same location for ModelPixels
+                            } else { // Others iterations we replace at same location for ModelPixels
                                 modelPixels.set(idx, p);
                             }
                         }
@@ -747,13 +783,15 @@ public class MainActivity extends Activity {
 
                         // Build Cost Function /////////////////////////////////////////////////////
                         CostFunction costFunc =  new CostFunction(facePixels, averagePixels, modelPixels,
-                                xBedMatrix, xModel83FtPt, s, t, bmpModel, sigmaI, sigmaF);
-                        float[] alpha = costFunc.getAlpha();
-                        float[] beta = costFunc.getBeta();
+                                xBedMatrix, xModel83FtPt, s, t, bmpModel, alpha, beta, modelShape, modelTexture, sigmaI, sigmaF);
+                        alpha = costFunc.getAlpha();
+                        beta = costFunc.getBeta();
                         ////////////////////////////////////////////////////////////////////////////
 
                         // Update Shape with alpha values //////////////////////////////////////////
-                        float res1 = 0.0f, res2 = 0.0f, res3 = 0.0f;
+                        res1 = 0.0f;
+                        res2 = 0.0f;
+                        res3 = 0.0f;
                         for(int idx=0; idx<NUM_CASES_POINTS; idx = idx + 3){
 
                             for(int i=0; i <60; i++){
@@ -761,14 +799,16 @@ public class MainActivity extends Activity {
                                 res2 += alpha[i] * s[idx + 1][i];
                                 res3 += alpha[i] * s[idx +2][i];
                             }
-                            modelShapeFinal[idx] = averageShape[idx] + res1;
-                            modelShapeFinal[idx + 1] = averageShape[idx + 1] + res2;
-                            modelShapeFinal[idx + 2] = averageShape[idx + 2] + res3;
+                            modelShape[idx] = averageShape[idx] + res1;
+                            modelShape[idx + 1] = averageShape[idx + 1] + res2;
+                            modelShape[idx + 2] = averageShape[idx + 2] + res3;
                         }
                         ////////////////////////////////////////////////////////////////////////////
 
                         // Update Texture with beta values ///////////////////////////////////////
-                        float res4 = 0.0f, res5 = 0.0f, res6 = 0.0f;
+                        res4 = 0.0f;
+                        res5 = 0.0f;
+                        res6 = 0.0f;
                         for(int idx=0; idx<NUM_CASES_POINTS; idx = idx + 3){
 
                             for(int i=0; i <100; i++){
@@ -776,9 +816,9 @@ public class MainActivity extends Activity {
                                 res5 += beta[i] * t[idx + 1][i];
                                 res6 += beta[i] * t[idx +2][i];
                             }
-                            modelTextureFinal[idx] = averageTexture[idx] + res4;
-                            modelTextureFinal[idx + 1] = averageTexture[idx + 1] + res5;
-                            modelTextureFinal[idx + 2] = averageTexture[idx + 2] + res6;
+                            modelTexture[idx] = averageTexture[idx] + res4;
+                            modelTexture[idx + 1] = averageTexture[idx + 1] + res5;
+                            modelTexture[idx + 2] = averageTexture[idx + 2] + res6;
                         }
                         ////////////////////////////////////////////////////////////////////////////
 
@@ -820,7 +860,7 @@ public class MainActivity extends Activity {
 
                 try {
                     IOHelper.convertPixelsToBin(facePixels, "3DFace/simplification_bin/Texture/faceTexture.dat");
-                    writeBinFloatScale(SHAPE_DIRECTORY, MODEL_SHAPE_FILE, modelShapeFinal);
+                    writeBinFloatScale(SHAPE_DIRECTORY, MODEL_SHAPE_FILE, modelShape);
                     msg = mHandler.obtainMessage(SAVE_OK);
                 } catch (Exception e) {
                     e.printStackTrace();
