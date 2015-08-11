@@ -34,6 +34,8 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.example.jrme.face3dv3.filters.convolution.SobelFilterGx;
+import com.example.jrme.face3dv3.filters.convolution.SobelFilterGy;
 import com.example.jrme.face3dv3.fitting.CostFunction;
 import com.example.jrme.face3dv3.util.IOHelper;
 import com.example.jrme.face3dv3.util.MyProcrustes;
@@ -48,6 +50,8 @@ import org.json.JSONObject;
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
+import org.opencv.android.Utils;
+import org.opencv.core.Mat;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -71,6 +75,7 @@ import static com.example.jrme.face3dv3.util.ImageHelper.fillHole1;
 import static com.example.jrme.face3dv3.util.ImageHelper.fillHole2;
 import static com.example.jrme.face3dv3.util.ImageHelper.saveBitmaptoPNG;
 import static com.example.jrme.face3dv3.util.MatrixHelper.centroid;
+import static com.example.jrme.face3dv3.util.MatrixHelper.maxMinXYZ;
 import static com.example.jrme.face3dv3.util.MatrixHelper.translate;
 import static com.example.jrme.face3dv3.util.PixelUtil.getMaxMin;
 import static java.lang.Math.abs;
@@ -112,7 +117,9 @@ public class MainActivity extends Activity {
     RealMatrix xVicMatrix = new Array2DRowRealMatrix(83, 2);
     RealMatrix xBedMatrix = new Array2DRowRealMatrix(83, 2);
     RealMatrix xResult = new Array2DRowRealMatrix(83, 2);
+    RealMatrix xAverage83FtPt = new Array2DRowRealMatrix(83, 2);
     RealMatrix xModel83FtPt = new Array2DRowRealMatrix(83, 2);
+
     private float[][] initialPoints = new float[83][2];
     float rollAngle = 0.0f;
 
@@ -588,46 +595,23 @@ public class MainActivity extends Activity {
                         averageShape2DFtPt.setEntry(i,0,averageShape2D.getEntry(tmp,0));
                         averageShape2DFtPt.setEntry(i,1, averageShape2D.getEntry(tmp,1));
                     }
-                    PointF cAverageShape2DFtPt = centroid(averageShape2DFtPt); // the Most Important CENTROID
-                    PointF RightEyeAverageShape2DFtPt = new PointF((float) averageShape2DFtPt.getEntry(66,0),
-                            (float) averageShape2DFtPt.getEntry(66,1)); // the point correspondant to the RightEyeCenter
+                    PointF rightEyeAverageShape2DFtPt = new PointF((float) averageShape2DFtPt.getEntry(66,0),
+                            (float) averageShape2DFtPt.getEntry(66,1)); // Point correspondant to the RightEyeCenter
                     ////////////////////////////////////////////////////////////////////////////////
-
-                    /*// Transform it by using centroid of AverageShape2DFtPt
-                    PointF origin = new PointF(0, 0); // Origin of the image
-                    PointF cInputFt = centroid(xBedMatrix); // where we want to go
-                    RealMatrix X0 = translate(averageShape2D, cAverageShape2DFtPt, origin);
-                    RealMatrix res = X0.multiply(R).scalarMultiply(S); //.add(tt);
-                    res = translate(res, origin, cInputFt);*/
 
                     // Transform it by using RightEye as Reference /////////////////////////////////
                     // Eyes must be perfectly aligned to show a "Good" Face ////////////////////////
                     PointF origin = new PointF(0, 0); // Origin of the image
-                    PointF RightEyeInputFt = new PointF((float) xBedMatrix.getEntry(66,0),(float) xBedMatrix.getEntry(66,1));
-                    RealMatrix X0 = translate(averageShape2D, RightEyeAverageShape2DFtPt, origin);
+                    PointF rightEyeInputFt = new PointF((float) xBedMatrix.getEntry(66,0),(float) xBedMatrix.getEntry(66,1));
+                    RealMatrix X0 = translate(averageShape2D, rightEyeAverageShape2DFtPt, origin);
                     RealMatrix averageShape2DRes = X0.multiply(R).scalarMultiply(S);
-                    averageShape2DRes = translate(averageShape2DRes, origin, RightEyeInputFt);
+                    averageShape2DRes = translate(averageShape2DRes, origin, rightEyeInputFt);
                     ////////////////////////////////////////////////////////////////////////////////
-
-                    /*// Cover in White the Face
-                    paint.setColor(Color.WHITE);
-                    for (int a = 0; a < res.getRowDimension(); a++) {
-                        canvas.drawPoint((float) res.getEntry(a, 0), (float) res.getEntry(a, 1), paint);
-                    }*/
-
-                    /*// Save Image
-                    img = bitmap;
-                    MainActivity.this.runOnUiThread(new Runnable() {
-                        public void run() {
-                            imageView.setImageBitmap(img);
-                        }
-                    });*/
 
                     // Get the Pixels of Face from the previous Image
                     facePixels = new ArrayList<>();
                     for (int i = 0; i < k; i++) {
                         try {
-                            // Ceil ?
                             int x = (int) Math.round(averageShape2DRes.getEntry(i, 0));
                             int y = (int) Math.round(averageShape2DRes.getEntry(i, 1));
                             Pixel p = new Pixel(x, y, imgBeforeDetect.getPixel(x, y)); // 1st Constructor x and y
@@ -638,51 +622,10 @@ public class MainActivity extends Activity {
                     }
                     Log.d(TAG,"facePixels size = "+facePixels.size());
 
-                    // Draw White on Face for every Pixels we extracted, Pixels left were not extract
+                    // Draw White on Face for every Pixels we have extracted
                     for (Pixel p : facePixels) {
                         bitmap.setPixel(p.getX(), p.getY(), Color.WHITE);
                     }
-
-                    /*paint.setColor(Color.MAGENTA);
-                    for (int i = 0; i<landmarks83Index.length; i++) { //
-                        int tmp = landmarks83Index[i] + 1; // this +1 is strange but it works
-                        canvas.drawPoint((float) res.getEntry(tmp, 0), (float) res.getEntry(tmp, 1), paint);
-                    }*/
-
-/*
-                    // Draw left eye center, index from Matlab
-                    paint.setColor(Color.BLUE);
-                    canvas.drawPoint((float) res.getEntry(44768, 0),
-                            (float) res.getEntry(44768, 1), paint);
-                    canvas.drawPoint((float) res.getEntry(22614, 0),
-                            (float) res.getEntry(22614, 1), paint);*/
-
-                    /*// Draw Result 83 Points
-                    paint.setColor(Color.MAGENTA);
-                    for (int i = 0; i < 83; i++) {
-                        canvas.drawPoint((float) xResult.getEntry(i, 0), (float) xResult.getEntry(i, 1), paint);
-                    }*/
-
-                    /*// Rotate the 83 Results Points (because upside down) //////////////////////////
-                    PointF cRes1Ft = centroid(xResult);
-                    RealMatrix xResult2 = xResult.copy();
-                    for (int i = 0; i < 83; i++) {
-                        xResult2.setEntry(i, 0, img.getWidth() - xResult.getEntry(i, 0));
-                        xResult2.setEntry(i, 1, img.getHeight() - xResult.getEntry(i, 1));
-                    }
-                    PointF cRes2tFt = centroid(xResult2);
-                    RealMatrix xResultRotated = translate(xResult2, cRes2tFt, cRes1Ft);
-                    paint.setColor(Color.YELLOW);
-                    // Draw on Face
-                    for (int i = 0; i < 83; i++) {
-                        canvas.drawPoint( (float) xResultRotated.getEntry(i, 0), (float) xResultRotated.getEntry(i, 1), paint);
-                    }
-                    paint.setColor(Color.BLUE);
-                    canvas.drawPoint((float) xResultRotated.getEntry(27, 0),
-                            (float) xResultRotated.getEntry(27, 1), paint);
-                    canvas.drawPoint((float) xResultRotated.getEntry(66, 0),
-                            (float) xResultRotated.getEntry(66, 1), paint);
-                    ////////////////////////////////////////////////////////////////////////////////*/
 
                     // Save Image
                     img = bitmap;
@@ -721,9 +664,9 @@ public class MainActivity extends Activity {
                         beta[i] = 1.0f / 100.0f; // initial beta value
                     }
                     // Initial Shape Model with initial alpha //////////////////////////////////////
-                    float res1 = 0.0f, res2 = 0.0f, res3 = 0.0f;
+                    float res1, res2, res3;
                     for(int idx=0; idx<NUM_CASES_POINTS; idx = idx + 3){
-
+                        res1 = 0.0f; res2 = 0.0f; res3 = 0.0f;
                         for(int i=0; i <60; i++){
                             res1 += alpha[i] * s[idx][i];
                             res2 += alpha[i] * s[idx + 1][i];
@@ -736,9 +679,9 @@ public class MainActivity extends Activity {
                     ////////////////////////////////////////////////////////////////////////////////
 
                     // Initial Texture Model with initial beta /////////////////////////////////////
-                    float res4 = 0.0f, res5 = 0.0f, res6 = 0.0f;
+                    float res4, res5, res6;
                     for(int idx=0; idx<NUM_CASES_POINTS; idx = idx + 3){
-
+                        res4 = 0.0f; res5 = 0.0f; res6 = 0.0f;
                         for(int i=0; i <100; i++){
                             res4 += beta[i] * t[idx][i];
                             res5 += beta[i] * t[idx + 1][i];
@@ -750,50 +693,87 @@ public class MainActivity extends Activity {
                     }
                     ////////////////////////////////////////////////////////////////////////////////
 
-                    // Model 83 Feature Points
+                    // Build Average Pixels
+                    // Contains Average Shape and Average Texture data
+                    for(int i=0, idx=0; i<NUM_CASES_POINTS; i=i+3,idx++){
+                        //get R G B and X Y
+                        int rgb = Color.rgb((int) averageTexture[i], (int) averageTexture[i + 1], (int) averageTexture[i + 2]);
+                        Pixel p = new Pixel(averageShape[i], averageShape[i + 2], rgb); // 2nd Constructor with xF and yF
+                        averagePixels.add(idx, p);
+                    }
+                    modelPixels = averagePixels; // just initialy populate the list, the values doesnt matter
+
+                    // Build Average 83 Feature Points (after Procrustes in the image)
                     for (int i = 0; i<landmarks83Index.length; i++) {
                         int tmp = landmarks83Index[i] - 1; // -1 because the index starts at 1 in modelpoint_index file
-                        xModel83FtPt.setEntry(i, 0, averageShape2DRes.getEntry(tmp,0));
-                        xModel83FtPt.setEntry(i, 1, averageShape2DRes.getEntry(tmp,1));
-                        Log.d(TAG, "xModel83FtPt with tmp = " + tmp + "(" + xModel83FtPt.getEntry(i,0)
-                                + "," + xModel83FtPt.getEntry(i,1) + ")");
+                        xAverage83FtPt.setEntry(i, 0, averageShape2DRes.getEntry(tmp,0));
+                        xAverage83FtPt.setEntry(i, 1, averageShape2DRes.getEntry(tmp, 1));
                     }
 
-                    Log.d(TAG,"averagePixels size = "+ modelPixels.size());
-                    Log.d(TAG, "Average Face load successfully");
+                    Log.d(TAG, "Start Cost Function Itearation");
 
-                    // Iteration ///////////////////////////////////////////////////////////////////
-                    for(int it = 0; it < 3; it++){
+                    ////////////////////////////////////////////////////////////////////////////////
+                    ////////////////////////////////// Iteration ///////////////////////////////////
+                    ////////////////////////////////////////////////////////////////////////////////
+                    for(int it = 0; it < 10; it++){
 
-                        // Build Model Pixels (first iteration Average Face data)
-                        // Contains Shape and Texture data
-                        for(int i=0, idx=0; i<NUM_CASES_POINTS; i=i+3,idx++){
-                            //get R G B and X Y
-                            int rgb = Color.rgb((int) modelTexture[i], (int) modelTexture[i + 1], (int) modelTexture[i + 2]);
-                            Pixel p = new Pixel(modelShape[i], modelShape[i + 2], rgb); // 2nd Constructor with xF and yF
-                            // First iteration we add to the list
-                            if(it == 0){
-                                modelPixels.add(idx, p);
-                                averagePixels.add(idx, p);
-                            } else { // Others iterations we replace at same location for ModelPixels
-                                modelPixels.set(idx, p);
-                            }
+                        // Procrustes Analysis Transformation //////////////////////////////////////
+                        // Build the Model 2D Shape and 83 Feature Points in it ////////////////////
+                        RealMatrix modelShape2D = new Array2DRowRealMatrix(k, 2); // k = 8489
+                        for (int i = 0, idx = 0; i < k ; i++, idx = idx + 3) {
+                            modelShape2D.setEntry(i,0, modelShape[idx]);
+                            modelShape2D.setEntry(i,1, modelShape[idx + 2]);
                         }
-                        Bitmap bmpModel = modelImage(); // first ieration is Average Face in 2D
 
+                        RealMatrix modelShape2DFtPt = new Array2DRowRealMatrix(83, 2);
+                        for (int i = 0; i<landmarks83Index.length; i++) {
+                            int tmp = landmarks83Index[i] - 1; // -1 because the index starts at 1 in modelpoint_index file
+                            modelShape2DFtPt.setEntry(i,0, modelShape2D.getEntry(tmp,0));
+                            modelShape2DFtPt.setEntry(i,1, modelShape2D.getEntry(tmp,1));
+                        }
+
+                        PointF rightEyeModelShape2DFtPt = new PointF((float) modelShape2DFtPt.getEntry(66,0),
+                                (float) modelShape2DFtPt.getEntry(66,1)); // the point correspondant to the RightEyeCenter
+
+                        // Transform it by using RightEye as Reference ///
+                        // Eyes must be perfectly aligned to show a "Good" Face ///
+                        X0 = translate(modelShape2D, rightEyeModelShape2DFtPt, origin);
+                        RealMatrix modelShape2DRes = X0.multiply(R).scalarMultiply(S);
+                        modelShape2DRes = translate(modelShape2DRes, origin, rightEyeInputFt); // Result Matrix of PA
+                        ////////////////////////////////////////////////////////////////////////////
+
+                        // Build Model 83 Feature Points (after Procrustes in the image)
+                        for (int i = 0; i<landmarks83Index.length; i++) {
+                            int tmp = landmarks83Index[i] - 1; // -1 because the index starts at 1 in modelpoint_index file
+                            xModel83FtPt.setEntry(i, 0, modelShape2DRes.getEntry(tmp,0));
+                            xModel83FtPt.setEntry(i, 1, modelShape2DRes.getEntry(tmp, 1));
+                        }
+
+                        // Update Model Pixels
+                        // Contains Model Shape and Model Texture data
+                        for(int idx = 0, i = 0; idx <NUM_CASES_POINTS; idx = idx + 3, i++){
+                            //get R G B and X Y
+                            int rgb = Color.rgb((int) modelTexture[idx], (int) modelTexture[idx + 1], (int) modelTexture[idx + 2]);
+                            Pixel p = new Pixel(modelShape[idx], modelShape[idx + 2], rgb); // 2nd Constructor with xF and yF
+                            modelPixels.set(i, p);
+                        }
+                        Bitmap bmpModel = modelImage(); // Create Image of the model
+/*
+                        Bitmap bmpSobelGx = BmpSobelGx(bmpModel);
+                        saveBitmaptoPNG(TEXTURE_DIRECTORY, "bmpSobelGx.png", bmpSobelGx); //save
+                        Bitmap bmpSobelGy = BmpSobelGy(bmpModel);
+                        saveBitmaptoPNG(TEXTURE_DIRECTORY, "bmpSobelGy.png", bmpSobelGy); //save
+*/
                         // Build Cost Function /////////////////////////////////////////////////////
                         CostFunction costFunc =  new CostFunction(facePixels, averagePixels, modelPixels,
-                                xBedMatrix, xModel83FtPt, s, t, bmpModel, alpha, beta, modelShape, modelTexture, sigmaI, sigmaF);
+                                xBedMatrix, xAverage83FtPt, xModel83FtPt, s, t, bmpModel, alpha, beta, sigmaI, sigmaF);
                         alpha = costFunc.getAlpha();
                         beta = costFunc.getBeta();
                         ////////////////////////////////////////////////////////////////////////////
 
                         // Update Shape with alpha values //////////////////////////////////////////
-                        res1 = 0.0f;
-                        res2 = 0.0f;
-                        res3 = 0.0f;
                         for(int idx=0; idx<NUM_CASES_POINTS; idx = idx + 3){
-
+                            res1 = 0.0f; res2 = 0.0f; res3 = 0.0f;
                             for(int i=0; i <60; i++){
                                 res1 += alpha[i] * s[idx][i];
                                 res2 += alpha[i] * s[idx + 1][i];
@@ -806,11 +786,8 @@ public class MainActivity extends Activity {
                         ////////////////////////////////////////////////////////////////////////////
 
                         // Update Texture with beta values ///////////////////////////////////////
-                        res4 = 0.0f;
-                        res5 = 0.0f;
-                        res6 = 0.0f;
                         for(int idx=0; idx<NUM_CASES_POINTS; idx = idx + 3){
-
+                            res4 = 0.0f; res5 = 0.0f; res6 = 0.0f;
                             for(int i=0; i <100; i++){
                                 res4 += beta[i] * t[idx][i];
                                 res5 += beta[i] * t[idx + 1][i];
@@ -1063,7 +1040,6 @@ public class MainActivity extends Activity {
             }
         }
         // fill the pixels hole
-
         fillHole1(bmpModel);
         fillHole2(bmpModel);
         fillHole2(bmpModel); // again
@@ -1073,8 +1049,8 @@ public class MainActivity extends Activity {
         return bmpModel;
     }
 
-    /*
-    Sobel is applied inside the Cost Function
+
+    //Sobel is applied inside the Cost Function
     /////////////////////////////////// Apply Sobel Filter /////////////////////////////////////////
     private Bitmap BmpSobelGx(Bitmap srcBmp) {
         // variables
@@ -1110,5 +1086,5 @@ public class MainActivity extends Activity {
         return dstBmp;
     }
     ////////////////////////////////////////////////////////////////////////////////////////////////
-*/
+
 }

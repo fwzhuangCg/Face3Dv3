@@ -165,7 +165,7 @@ public class MatrixHelper {
         Log.d(TAG, "minX = "+res[1]);
 
         Log.d(TAG, "maxY = "+res[2]);
-        Log.d(TAG, "maxY = "+res[3]);
+        Log.d(TAG, "minY = "+res[3]);
 
         Log.d(TAG, "maxZ = "+res[4]);
         Log.d(TAG, "minZ = "+res[5]);

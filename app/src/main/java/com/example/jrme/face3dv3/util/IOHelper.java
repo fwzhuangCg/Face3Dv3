@@ -186,7 +186,7 @@ public class IOHelper {
         //float minX = -90.3540f, minY = -22.1150f, minZ = -88.7720f, maxX = 101.3830f, maxY = 105.1860f, maxZ = 102.0530f;
 
         // values for average shape after simplification (8489 points)
-        float minX = -85.4616f, minY = -18.0376f, minZ = -90.4051f, maxX = 95.4549f, maxY = 115.0088f, maxZ = 106.7329f;
+        float maxX = 95.4549f, minX = -85.4616f, maxY = 115.0088f, minY = -18.0376f, maxZ = 106.7329f, minZ = -90.4051f;
 
         float deltaX = (maxX - minX) / 2.0f;
         float deltaY = (maxY - minY) / 2.0f;

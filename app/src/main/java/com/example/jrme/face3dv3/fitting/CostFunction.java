@@ -60,6 +60,7 @@ public class CostFunction {
     private List<Pixel> input;
     private List<Pixel> average;
     private RealMatrix inputFeatPts;
+    private RealMatrix averageFeatPts;
     private RealMatrix modelFeatPts;
     private int k; //83
     private int num_cases_points; //
@@ -78,19 +79,18 @@ public class CostFunction {
 
     /////////////////////////////////// Constructor ////////////////////////////////////////////////
     public CostFunction(List<Pixel> input, List<Pixel> average, List<Pixel> model, RealMatrix inputFeatPts,
-                        RealMatrix modelFeatPts, float [][] eigenVectorsS, float [][] eigenVectorsT,
-                        Bitmap bmpModel, float[] inputAlpha, float[] inputBeta, float[] modelShape,
-                        float[] modelTexture, float sigmaI, float sigmaF) {
+                        RealMatrix averageFeatPts, RealMatrix modelFeatPts, float [][] eigenVectorsS, float [][] eigenVectorsT,
+                        Bitmap bmpModel, float[] inputAlpha, float[] inputBeta, float sigmaI, float sigmaF) {
 
         //this.featPtsIndex = readBin83PtIndex(CONFIG_DIRECTORY, INDEX83PT_FILE);
         this.input = input;
         this.average = average;
         this.model = model;
         this.inputFeatPts = inputFeatPts;
+        this.averageFeatPts = averageFeatPts;
         this.modelFeatPts = modelFeatPts;
         this.k = inputFeatPts.getRowDimension(); // should be equal to 83
-
-        this.num_cases_points = modelShape.length; // should be equal to 8489
+        this.num_cases_points = input.size(); // should be equal to 8489
 
         this.eigValS = readBinFloat(SHAPE_DIRECTORY, EIG_SHAPE_FILE, 60);
         this.eigValT = readBinFloat(TEXTURE_DIRECTORY, EIG_TEXTURE_FILE, 100);
@@ -99,12 +99,6 @@ public class CostFunction {
         // instead of using subFSV file
 
         // Checking arguments
-        if(modelShape.length == 0 || modelTexture.length == 0 ){
-            throw new IllegalArgumentException("modelShape or modelTexture length equal 0");
-        }
-        if(modelShape.length != modelTexture.length){
-            throw new IllegalArgumentException("modelShape and modelTexture do not have the same length");
-        }
         if(input.isEmpty() || average.isEmpty() || model.isEmpty()){
             throw new IllegalArgumentException("input or average or model list are empty");
         }
@@ -116,6 +110,9 @@ public class CostFunction {
         }
         if(average.size() != model.size()){
             throw new IllegalArgumentException("average and model list do not have the same size");
+        }
+        if(averageFeatPts.getRowDimension() != k || averageFeatPts.getColumnDimension() != inputFeatPts.getColumnDimension()){
+            throw new IllegalArgumentException("inputFeatPts and averageFeatPts do not have the same size");
         }
         if(modelFeatPts.getRowDimension() != k || modelFeatPts.getColumnDimension() != inputFeatPts.getColumnDimension()){
             throw new IllegalArgumentException("inputFeatPts and modelFeatPts do not have the same size");
@@ -151,7 +148,7 @@ public class CostFunction {
         this.alpha = inputAlpha; // Init
         this.beta = inputBeta;  // Init
         computeAlpha(); // Compute 60 alpha values output
-        computeAlpha(); // Compute 100 beta values output
+        computeBeta(); // Compute 100 beta values output
     }
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -221,6 +218,17 @@ public class CostFunction {
     /////////////////////////////////// Equation 18 ////////////////////////////////////////////////
     private float computeEf(){
         float res = 0.0f;
+        for(int j = 0; j < k; j++) {
+            res += pow(inputFeatPts.getEntry(j,0) - modelFeatPts.getEntry(j,0), 2)
+                    + pow(inputFeatPts.getEntry(j,1) - modelFeatPts.getEntry(j,1), 2);
+        }
+        return res;
+    }
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
+/*    /////////////////////////////////// Equation 18 ////////////////////////////////////////////////
+    private float computeEf(){
+        float res = 0.0f;
         RealMatrix modelP = Pmodel();
         for(int j = 0; j < k; j++) {
             res += pow(inputFeatPts.getEntry(j,0) - modelP.getEntry(j,0), 2)
@@ -228,17 +236,17 @@ public class CostFunction {
         }
         return res;
     }
-    ////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////*/
 
-    /////////////////////////////////// Calculate P Matrix of Equation 18 //////////////////////////
+/*    /////////////////////////////////// Calculate P Matrix of Equation 18 //////////////////////////
     private RealMatrix Pmodel(){
         RealMatrix res = new Array2DRowRealMatrix(83, 2);
 
         for(int j = 0; j< k ; j++){
-            double X = modelFeatPts.getEntry(j, 0), Y = modelFeatPts.getEntry(j,1);
+            double X = averageFeatPts.getEntry(j, 0), Y = averageFeatPts.getEntry(j,1);
             for(int i =0; i<60; i++){
-                /*X += alpha[i] * subFSV[i][j][0];
-                Y += alpha[i] * subFSV[i][j][2];*/ // not accurate
+                *//*X += alpha[i] * subFSV[i][j][0];
+                Y += alpha[i] * subFSV[i][j][2];*//* // not accurate
                 X += inputAlpha[i] * s[ (landmarks83Index[j]-1) * 3 ][i]; //we get the value directly from featureShape file // - 1 because java index
                 Y += inputAlpha[i] * s[ (landmarks83Index[j]-1) * 3 + 2 ][i];
             }
@@ -247,13 +255,13 @@ public class CostFunction {
         }
         return res;
     }
-    ////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////*/
 
     /////////////////////////////////// Equation 31 ////////////////////////////////////////////////
     private void computeAlpha(){
 
         float[] alphaStar = new float[60];
-        float num, denum, lambda = 0.0001f; // initial 0.0001f;   or 0.000005f
+        float num, denum, lambda =  0.0001f; // initial 0.0001f;   or 0.000005f or 0.0005
 
         for(int i=0; i<60-1; i++){
 
@@ -300,6 +308,13 @@ public class CostFunction {
         float num, denum, lambda = 0.0001f; // initial 0.0001f;
 
         for(int i=0; i<100-1; i++){
+
+            // Pick 500 Random Vertices Index each iteration
+            Random r = new Random();
+            for(int h =0; h< 500; h++){
+                this.randomList.set(h, r.nextInt(end - start + 1) + start);
+            }
+
             Log.d(TAG,"compute beta, i = "+ i);
             Log.d(TAG,"beta[" + i + "] = " + beta[i]);
 
@@ -327,6 +342,7 @@ public class CostFunction {
 
         // Gray-Level calculation : I = 0.299R + 0.5876G + 0.114B
         for(int l =0; l < num_cases_points; l++) {
+
             res = 0.299f * input.get(l).getR()
                     + 0.5876f * input.get(l).getG()
                     + 0.114f * input.get(l).getB();
@@ -342,6 +358,7 @@ public class CostFunction {
 
         // Gray-Level calculation : I = 0.299R + 0.5876G + 0.114B
         for(int l =0; l < num_cases_points; l++) {
+
             tmp = 0.299f * average.get(l).getR()
                     + 0.5876f * average.get(l).getG()
                     + 0.114f * average.get(l).getB();
@@ -359,9 +376,9 @@ public class CostFunction {
         float[][] IinputB = new float[num_cases_points][3];
 
         for(int l = 0; l < num_cases_points; l++) {
-            IinputB[l][0] = average.get(l).getR();
-            IinputB[l][1] = average.get(l).getG();
-            IinputB[l][2] = average.get(l).getB();
+            IinputB[l][0] = input.get(l).getR();
+            IinputB[l][1] = input.get(l).getG();
+            IinputB[l][2] = input.get(l).getB();
         }
         return IinputB;
     }
@@ -372,9 +389,8 @@ public class CostFunction {
         float tmp, tmp2, tmp3;
 
         for(int l = 0; l < num_cases_points; l++) {
-            tmp = 0.0f;
-            tmp2 = 0.0f;
-            tmp3 = 0.0f;
+
+            tmp = 0.0f; tmp2 = 0.0f; tmp3 = 0.0f;
             for(int i =0; i< 100; i++){
                 tmp += inputBeta[i] * t[l * 3][i];
                 tmp2 += inputBeta[i] * t[l * 3 + 1][i];
@@ -413,13 +429,14 @@ public class CostFunction {
     }
 
     private float derivEfAlpha(int i){
-        float res=0.0f, xIn, yIn, xA, yA, tmp = 0.0f;
+        float res=0.0f, xIn, yIn, xA, yA, tmp;
         for(int j=0; j<k; j++) {
             xIn = (float) inputFeatPts.getEntry(j,0);
             yIn = (float) inputFeatPts.getEntry(j,1);
-            xA = (float) modelFeatPts.getEntry(j,0);
-            yA = (float) modelFeatPts.getEntry(j,1);
+            xA = (float) averageFeatPts.getEntry(j,0);
+            yA = (float) averageFeatPts.getEntry(j,1);
 
+            tmp = 0.0f;
             for(int a =0; a < 60; a++){
                 //tmp += alpha[a] * (subFSV[a][j][0] + subFSV[a][j][2]);
                 tmp += alpha[a] * (s[ (landmarks83Index[j]-1) * 3 ][a] + s[ (landmarks83Index[j]-1) * 3 + 2 ][a]);
@@ -445,9 +462,6 @@ public class CostFunction {
     private float derivImodelAlpha(int i, int idx){
         float Gx, Gy;
         float res;
-
-        /*int x = average.get(idx).getX();
-        int y = average.get(idx).getY();*/
 
         int x = model.get(idx).getX();
         int y = model.get(idx).getY();
