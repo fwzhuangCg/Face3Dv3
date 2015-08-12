@@ -63,7 +63,7 @@ public class CostFunction {
     private RealMatrix averageFeatPts;
     private RealMatrix modelFeatPts;
     private int k; //83
-    private int num_cases_points; //
+    private int num_points; //
     private Mat dxModel;
     private Mat dyModel;
 
@@ -90,7 +90,7 @@ public class CostFunction {
         this.averageFeatPts = averageFeatPts;
         this.modelFeatPts = modelFeatPts;
         this.k = inputFeatPts.getRowDimension(); // should be equal to 83
-        this.num_cases_points = input.size(); // should be equal to 8489
+        this.num_points = input.size(); // should be equal to 8489
 
         this.eigValS = readBinFloat(SHAPE_DIRECTORY, EIG_SHAPE_FILE, 60);
         this.eigValT = readBinFloat(TEXTURE_DIRECTORY, EIG_TEXTURE_FILE, 100);
@@ -99,6 +99,12 @@ public class CostFunction {
         // instead of using subFSV file
 
         // Checking arguments
+        if(num_points != 8489){
+            throw new IllegalArgumentException("num_points not equal 8489");
+        }
+        if(k != 83){
+            throw new IllegalArgumentException("k not equal 83");
+        }
         if(input.isEmpty() || average.isEmpty() || model.isEmpty()){
             throw new IllegalArgumentException("input or average or model list are empty");
         }
@@ -156,6 +162,7 @@ public class CostFunction {
     public float[] getAlpha() {
         return alpha;
     }
+
     public float[] getBeta() {
         return beta;
     }
@@ -176,8 +183,6 @@ public class CostFunction {
 
         Log.d(TAG,"sigmaI = "+ sigmaI);
         Log.d(TAG,"sigmaF = "+ sigmaF);
-        Log.d(TAG,"sum_Alpha_eigValS() = "+ sum_Alpha_eigValS());
-        Log.d(TAG,"sum_Beta_eigValT() = "+ sum_Beta_eigValT());
         Log.d(TAG,"Ei = "+ Ei);
         Log.d(TAG,"Ef = "+ Ef);
         Log.d(TAG,"E = " + E);
@@ -207,7 +212,6 @@ public class CostFunction {
     /////////////////////////////////// Equation 17 ////////////////////////////////////////////////
     private float computeEi(){
         float res = 0.0f;
-
         for(int idx : randomList) {
             res += pow(Iinput[idx] - Imodel[idx], 2);
         }
@@ -267,7 +271,7 @@ public class CostFunction {
 
             // Pick 500 Random Vertices Index each iteration
             Random r = new Random();
-            for(int h =0; h< 500; h++){
+            for(int h = 0; h< 500; h++){
                 this.randomList.set(h, r.nextInt(end - start + 1) + start);
             }
 
@@ -338,10 +342,10 @@ public class CostFunction {
     // Calculate Iinput (for Alpha)
     private float[] computeIinput(){
         float res;
-        float[] IinputA = new float[num_cases_points];
+        float[] IinputA = new float[num_points];
 
         // Gray-Level calculation : I = 0.299R + 0.5876G + 0.114B
-        for(int l =0; l < num_cases_points; l++) {
+        for(int l = 0; l < num_points; l++) {
 
             res = 0.299f * input.get(l).getR()
                     + 0.5876f * input.get(l).getG()
@@ -353,11 +357,11 @@ public class CostFunction {
 
     // Calculate Imodel (for Alpha)
     private float[]  computeImodel(){
-        float[] ImodelA = new float[num_cases_points];
+        float[] ImodelA = new float[num_points];
         float tmp, tmp2;
 
         // Gray-Level calculation : I = 0.299R + 0.5876G + 0.114B
-        for(int l =0; l < num_cases_points; l++) {
+        for(int l =0; l < num_points; l++) {
 
             tmp = 0.299f * average.get(l).getR()
                     + 0.5876f * average.get(l).getG()
@@ -373,9 +377,9 @@ public class CostFunction {
 
     // Calculate Iinput for Beta
     private float[][] computeIinputBeta(){
-        float[][] IinputB = new float[num_cases_points][3];
+        float[][] IinputB = new float[num_points][3];
 
-        for(int l = 0; l < num_cases_points; l++) {
+        for(int l = 0; l < num_points; l++) {
             IinputB[l][0] = input.get(l).getR();
             IinputB[l][1] = input.get(l).getG();
             IinputB[l][2] = input.get(l).getB();
@@ -385,10 +389,10 @@ public class CostFunction {
 
     // Calculate Imodel for Beta
     private float[][] computeImodelBeta(){
-        float[][] ImodelB = new float[num_cases_points][3];
+        float[][] ImodelB = new float[num_points][3];
         float tmp, tmp2, tmp3;
 
-        for(int l = 0; l < num_cases_points; l++) {
+        for(int l = 0; l < num_points; l++) {
 
             tmp = 0.0f; tmp2 = 0.0f; tmp3 = 0.0f;
             for(int i =0; i< 100; i++){

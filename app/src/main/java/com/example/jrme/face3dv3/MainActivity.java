@@ -575,14 +575,14 @@ public class MainActivity extends Activity {
                     Log.d(TAG, "T = " + T);
 
                     int NUM_CASES_POINTS_2 = fileSize(SHAPE_DIRECTORY, AVERAGE_SHAPE_2D_FILE) / BYTES_PER_FLOAT;
-                    int k = NUM_CASES_POINTS_2 / 2; // Number of Lines == Row Dimension
-                    Log.d(TAG,"k = " + k);
+                    int num_points = NUM_CASES_POINTS_2 / 2; // Number of Lines == Row Dimension // num_points = 8489
+                    Log.d(TAG,"num_points = " + num_points);
                     RealMatrix averageShape2D =
-                            readBin2DShapetoMatrix(SHAPE_DIRECTORY, AVERAGE_SHAPE_2D_FILE, k);
+                            readBin2DShapetoMatrix(SHAPE_DIRECTORY, AVERAGE_SHAPE_2D_FILE, num_points);
                     // Adapt the translation matrix to the new dimension (8489 rows)
                     double tx = T.getEntry(0, 0), ty = T.getEntry(0, 1);// +15; // +18; // Higher value the face go down
-                    RealMatrix tt = new Array2DRowRealMatrix(k, 2);
-                    for (int i = 0; i < k; i++) {
+                    RealMatrix tt = new Array2DRowRealMatrix(num_points, 2);
+                    for (int i = 0; i < num_points; i++) {
                         tt.setEntry(i, 0, tx);
                         tt.setEntry(i, 1, ty);
                     }
@@ -610,7 +610,7 @@ public class MainActivity extends Activity {
 
                     // Get the Pixels of Face from the previous Image
                     facePixels = new ArrayList<>();
-                    for (int i = 0; i < k; i++) {
+                    for (int i = 0; i < num_points; i++) {
                         try {
                             int x = (int) Math.round(averageShape2DRes.getEntry(i, 0));
                             int y = (int) Math.round(averageShape2DRes.getEntry(i, 1));
@@ -654,6 +654,9 @@ public class MainActivity extends Activity {
                             FEATURE_S_FILE, NUM_CASES_POINTS, 60); // Load the feature shape File
                    float [][] t = readBinFloatDoubleArray(TEXTURE_DIRECTORY,
                             FEATURE_T_FILE, NUM_CASES_POINTS, 100); // feature texture
+                    Log.d(TAG,"averageShape size = "+ averageShape.length);
+                    Log.d(TAG,"averageTexture size = "+ averageTexture.length);
+
                     float sigmaI = 10f, sigmaF = 1f;
                     float[] alpha = new float[60];
                     float[] beta = new float[100];
@@ -718,9 +721,9 @@ public class MainActivity extends Activity {
                     for(int it = 0; it < 10; it++){
 
                         // Procrustes Analysis Transformation //////////////////////////////////////
-                        // Build the Model 2D Shape and 83 Feature Points in it ////////////////////
-                        RealMatrix modelShape2D = new Array2DRowRealMatrix(k, 2); // k = 8489
-                        for (int i = 0, idx = 0; i < k ; i++, idx = idx + 3) {
+                        // Build the Model 2D Shape and 83 Feature Points in it /////////////
+                        RealMatrix modelShape2D = new Array2DRowRealMatrix(num_points, 2); // num_points = 8489
+                        for (int i = 0, idx = 0; i < num_points ; i++, idx = idx + 3) {
                             modelShape2D.setEntry(i,0, modelShape[idx]);
                             modelShape2D.setEntry(i,1, modelShape[idx + 2]);
                         }
