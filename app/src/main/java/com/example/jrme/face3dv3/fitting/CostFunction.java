@@ -13,6 +13,8 @@ import org.opencv.android.Utils;
 import org.opencv.core.Mat;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 
@@ -96,7 +98,7 @@ public class CostFunction {
         this.eigValT = readBinFloat(TEXTURE_DIRECTORY, EIG_TEXTURE_FILE, 100);
         /*this.subFSV = readBinSFSV(CONFIG_DIRECTORY, SFSV_FILE);*/
         this.landmarks83Index = readBin83PtIndex(CONFIG_DIRECTORY, INDEX83PT_FILE); //we access directly in featureShape file
-        // instead of using subFSV file
+                                                                                            // instead of using subFSV file
 
         // Checking arguments
         if(num_points != 8489){
@@ -151,10 +153,15 @@ public class CostFunction {
 
         this.E = computeE();
 
-        this.alpha = inputAlpha; // Init
-        this.beta = inputBeta;  // Init
+        this.alpha = inputAlpha; // Initialize
+        this.beta = inputBeta;  // Initialize
         computeAlpha(); // Compute 60 alpha values output
         computeBeta(); // Compute 100 beta values output
+
+/*        Collections.sort(randomList);
+        for(int idx : randomList) {
+            Log.d(TAG,"randomList = " + idx);
+        }*/
     }
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -274,17 +281,28 @@ public class CostFunction {
             for(int h = 0; h< 500; h++){
                 this.randomList.set(h, r.nextInt(end - start + 1) + start);
             }
+            Collections.sort(randomList);
 
             Log.d(TAG,"compute alpha, i = "+ i);
             Log.d(TAG,"alpha[" + i + "] = " + alpha[i]);
 
-            num = (float) ((1/pow(sigmaI,2)) * deriv2EiAlpha(i) * alpha[i]
+            // Some mistakes inside
+/*            num = (float) ((1/pow(sigmaI,2)) * deriv2EiAlpha(i) * alpha[i]
                     + (1/pow(sigmaF,2)) * deriv2EfAlpha(i) * alpha[i]
                     - (1/pow(sigmaI,2)) * derivEiAlpha(i) * alpha[i]
                     - (1/pow(sigmaF,2)) * derivEfAlpha(i) * alpha[i]
                     + (2/pow(eigValS[i],2)) * mean(alpha));
             denum = (float) ((1/pow(sigmaI,2)) * deriv2EiAlpha(i) * alpha[i]
                     + (1/pow(sigmaF,2)) * derivEfAlpha(i) * alpha[i]
+                    + (2/pow(eigValS[i],2)));*/
+
+            num = (float) ((1/pow(sigmaI,2)) * deriv2EiAlpha(i) * alpha[i]
+                    + (1/pow(sigmaF,2)) * deriv2EfAlpha(i) * alpha[i]
+                    - (1/pow(sigmaI,2)) * derivEiAlpha(i)
+                    - (1/pow(sigmaF,2)) * derivEfAlpha(i)
+                    + (2/pow(eigValS[i],2)) * mean(alpha));
+            denum = (float) ((1/pow(sigmaI,2)) * deriv2EiAlpha(i)
+                    + (1/pow(sigmaF,2)) * deriv2EfAlpha(i)
                     + (2/pow(eigValS[i],2)));
             alphaStar[i] = num/denum;
 
@@ -300,8 +318,8 @@ public class CostFunction {
      */
     private float mean(float[] data) {
         int sum = 0;
-        for (int i = 0; i < data.length; i++) {
-            sum += data[i];
+        for (float aData : data) {
+            sum += aData;
         }
         return sum/data.length;
     }
@@ -318,6 +336,7 @@ public class CostFunction {
             for(int h =0; h< 500; h++){
                 this.randomList.set(h, r.nextInt(end - start + 1) + start);
             }
+            Collections.sort(randomList); // sorting the list change nothing to the algorithm
 
             Log.d(TAG,"compute beta, i = "+ i);
             Log.d(TAG,"beta[" + i + "] = " + beta[i]);
@@ -333,7 +352,6 @@ public class CostFunction {
         int last = beta.length - 1;
         Log.d(TAG, "compute beta, i = " + last);
         Log.d(TAG, "beta[" + last + "] = " + beta[last]);
-
     }
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -434,7 +452,8 @@ public class CostFunction {
 
     private float derivEfAlpha(int i){
         float res=0.0f, xIn, yIn, xA, yA, tmp;
-        for(int j=0; j<k; j++) {
+
+        for(int j = 0; j<k; j++) {
             xIn = (float) inputFeatPts.getEntry(j,0);
             yIn = (float) inputFeatPts.getEntry(j,1);
             xA = (float) averageFeatPts.getEntry(j,0);

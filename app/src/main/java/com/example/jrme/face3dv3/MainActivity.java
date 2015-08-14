@@ -505,8 +505,8 @@ public class MainActivity extends Activity {
                     while (iterator.hasNext()) {
                         String key = iterator.next().toString();
                         JSONObject ori = rst.getJSONArray("result").getJSONObject(0).getJSONObject("landmark").getJSONObject(key);
-                        if(key.equals("left_eye_center")){
-                            Log.d(TAG,"left_eye_center index = "+i);
+                        if(key.equals("right_eye_center")){
+                            Log.d(TAG,"right_eye_center index = "+i);
                         }
                         float x = (float) ori.getDouble("x");
                         float y = (float) ori.getDouble("y");
