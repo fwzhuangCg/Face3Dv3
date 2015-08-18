@@ -124,6 +124,9 @@ public class MatrixHelper {
         m[15] = 0f;
     }
 
+    /*
+     * Return max and min in x, y, z coordinates from a float array
+     */
     public static float[] maxMinXYZ(float[] array){
         float maxX = 0.0f, minX = 0.0f, maxY = 0.0f, minY = 0.0f, maxZ = 0.0f, minZ = 0.0f;
         float[] res = new float[6];

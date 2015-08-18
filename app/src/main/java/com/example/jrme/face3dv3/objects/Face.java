@@ -82,7 +82,7 @@ public class Face {
 
         //////////////////////////// Show the 83 Feature Points ////////////////////////////////////
         int[] landmarks83Index = readBin83PtIndex(CONFIG_DIRECTORY, INDEX83PT_FILE);
-        for (int aLandmarks83Index : landmarks83Index) { //
+        for (int aLandmarks83Index : landmarks83Index) {
             int tmp = (aLandmarks83Index - 1 ) * 3; // -1 because the index starts at 1 in modelpoint_index file
             textureArray[tmp] = 0.0f;
             tmp++;

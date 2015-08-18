@@ -44,7 +44,7 @@ public class ImageHelper {
     }
 
     /**
-     * Fill the hole in the image
+     * Fill the hole in the image (version 1)
      */
     public static void fillHole1(Bitmap bmp){
 
@@ -58,7 +58,7 @@ public class ImageHelper {
     }
 
     /**
-     * Fill the hole in the image
+     * Fill the hole in the image (version 2)
      */
     public static void fillHole2(Bitmap bmp){
 
